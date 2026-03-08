@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Tablero Táctico y Georreferenciación - Defensa Civil Colombiana</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -25,11 +25,10 @@
     </script>
 
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; color: #1e293b; }
-        .section-card { background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
-        .resource-item { cursor: grab; user-select: none; transition: transform 0.2s, box-shadow 0.2s; }
-        .resource-item:hover { transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); background-color: #FFF0E6; }
-        .resource-item:active { cursor: grabbing; }
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; color: #1e293b; overflow: hidden; }
+        .section-card { background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 1rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        .resource-item { cursor: grab; user-select: none; transition: all 0.2s; }
+        .resource-item:hover, .resource-item:active { transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); background-color: #FFF0E6; }
         #canvas-wrapper { touch-action: none; cursor: crosshair; }
         .tool-btn.active-tool { background-color: #002855; border-color: #002855; color: white; }
         
@@ -40,26 +39,41 @@
 
         @media print {
             body { background: white !important; overflow: visible !important; height: auto !important; display: block !important; }
-            aside, header .no-print, .no-print, #upload-prompt { display: none !important; }
+            aside, header .no-print, .no-print, #upload-prompt, #orientation-warning { display: none !important; }
             main { display: block !important; overflow: visible !important; }
             .section-card { box-shadow: none !important; border: 1px solid #ccc !important; page-break-inside: avoid; margin-bottom: 20px; }
+            #sci201-content { display: block !important; } /* Siempre mostrar en impresión */
             #canvas-container { height: 400px !important; border: 1px solid #000; page-break-inside: avoid; }
             .table-container, #grupos-container { max-height: none !important; overflow: visible !important; }
             textarea { height: auto !important; overflow: visible !important; resize: none; border: none !important; background: transparent !important; }
             input, select { border: none !important; background: transparent !important; appearance: none; }
             .obj-status { border: 1px solid #ddd !important; background: white !important; }
-            input[type="checkbox"] { display: none; } /* Ocultar checkboxes en impresión */
+            input[type="checkbox"] { display: none; } 
+            .no-page-break { page-break-inside: avoid; }
         }
 
-        /* Pulsing animation for active tracking */
+        /* Bloqueo de pantalla en modo Vertical (Portrait) para celulares */
+        #orientation-warning { display: none; }
+        @media (max-width: 800px) and (orientation: portrait) {
+            #command-center-ui { display: none !important; }
+            #orientation-warning { display: flex !important; }
+        }
+
         @keyframes pulse-ring { 0% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(255, 107, 0, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 15px rgba(255, 107, 0, 0); } 100% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(255, 107, 0, 0); } }
         .gps-active-ring { animation: pulse-ring 2s infinite; }
-        
-        /* Checkbox styling */
         .toggle-checkbox:checked { background-color: #FF6B00; border-color: #FF6B00; }
     </style>
 </head>
 <body class="antialiased h-screen flex flex-col overflow-hidden">
+
+    <!-- PANTALLA ADVERTENCIA GIRO DE CELULAR -->
+    <div id="orientation-warning" class="fixed inset-0 z-[999] bg-dcc-blue text-white flex-col items-center justify-center p-6 text-center">
+        <svg class="w-24 h-24 mb-6 text-dcc-orange animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+        </svg>
+        <h2 class="text-3xl font-bold mb-4">Gire su dispositivo</h2>
+        <p class="text-lg mb-6">Para acceder al Tablero Táctico y tener espacio visual para los mapas y recursos, coloque su celular en posición <b>horizontal</b>.</p>
+    </div>
 
     <!-- PANTALLA MODO RASTREADOR (Para el voluntario en terreno vía NFC) -->
     <div id="tracker-mode-ui" class="hidden fixed inset-0 z-[100] bg-dcc-blue flex flex-col items-center justify-center text-white p-6">
@@ -76,50 +90,50 @@
         <button id="toggle-tracking-btn" class="bg-dcc-orange hover:bg-orange-600 text-white font-bold py-4 px-8 rounded-full shadow-lg text-lg w-full max-w-xs transition">
             Iniciar Transmisión GPS
         </button>
-        <p class="mt-4 text-xs text-center text-gray-400 max-w-xs">Asegúrese de otorgar permisos de ubicación al navegador para que el Puesto de Comando pueda visualizarlo en el mapa.</p>
     </div>
 
     <!-- PANTALLA PUESTO DE COMANDO (Principal) -->
     <div id="command-center-ui" class="flex flex-col h-full w-full">
-        <!-- Header Institucional -->
-        <header class="bg-dcc-orange text-white shadow-md z-50 flex-none">
-            <div class="container mx-auto px-4 py-2 flex justify-between items-center">
-                <div class="flex items-center space-x-4">
-                    <div class="bg-white rounded-lg p-1 shadow-sm">
-                        <img src="https://www.defensacivil.gov.co/_templates/DEFCIVIL-PORTAL-2020/recursos/images/cabezote/Logo-Defensoria-Civil.png" alt="Logo DCC" class="h-10 w-auto object-contain">
+        
+        <!-- Franja Azul (30% de la Naranja aprox) -->
+        <div class="h-2 md:h-3 w-full bg-dcc-blue flex-none"></div>
+
+        <!-- Header Institucional (Naranja) -->
+        <header class="bg-dcc-orange text-white shadow-md z-50 flex-none px-2 py-1 md:py-2">
+            <div class="flex justify-between items-center gap-2">
+                <div class="flex items-center space-x-2 md:space-x-4">
+                    <div class="bg-white rounded p-1 shadow-sm shrink-0">
+                        <img src="https://www.defensacivil.gov.co/_templates/DEFCIVIL-PORTAL-2020/recursos/images/cabezote/Logo-Defensoria-Civil.png" alt="Logo DCC" class="h-6 md:h-10 w-auto object-contain">
                     </div>
                     <div>
-                        <h1 class="text-lg md:text-xl font-bold tracking-wide drop-shadow-md">DEFENSA CIVIL COLOMBIANA</h1>
-                        <p class="text-xs text-dcc-blue font-bold bg-white/90 inline-block px-2 py-0.5 rounded mt-0.5">SISTEMA COMANDO DE INCIDENTES</p>
+                        <h1 class="text-sm md:text-xl font-bold tracking-wide drop-shadow-md leading-tight">DEFENSA CIVIL COLOMBIANA</h1>
+                        <p class="text-[8px] md:text-xs text-dcc-blue font-bold bg-white/90 inline-block px-1.5 md:px-2 py-0.5 rounded uppercase">TABLA OPERATIVA DE SISTEMA COMANDO DE INCIDENTES DCC</p>
                     </div>
                 </div>
-                <div class="hidden lg:flex items-center gap-3 text-sm no-print">
-                    <!-- Botones de Guardado Offline y Exportación -->
-                    <button id="btn-import-json" class="bg-white/20 hover:bg-white/30 text-white py-1.5 px-3 rounded text-xs flex items-center gap-1 transition" title="Cargar archivo JSON">
-                        📂 Cargar Incidente
-                    </button>
-                    <input type="file" id="import-file-input" class="hidden" accept=".json">
-                    <button id="btn-export-json" class="bg-white/20 hover:bg-white/30 text-white py-1.5 px-3 rounded text-xs flex items-center gap-1 transition" title="Guardar copia local JSON">
-                        💾 Guardar Archivo
-                    </button>
-                    <button onclick="window.print()" class="bg-dcc-blue hover:bg-blue-900 text-white font-bold py-1.5 px-4 rounded shadow flex items-center gap-2 transition ml-2">
-                        🖨️ Imprimir / PDF
-                    </button>
+                <div class="flex items-center gap-1 md:gap-3 text-[10px] md:text-sm no-print">
+                    <button id="btn-import-json" class="bg-white/20 hover:bg-white/30 text-white py-1 px-2 rounded flex items-center gap-1 border border-white/30" title="Cargar archivo">📂 <span class="hidden md:inline">Cargar</span></button>
+                    <!-- Input unificado para mapas, evidencias y JSON -->
+                    <input type="file" id="global-file-input" class="hidden">
+                    <button id="btn-export-json" class="bg-white/20 hover:bg-white/30 text-white py-1 px-2 rounded flex items-center gap-1 border border-white/30" title="Guardar archivo local">💾 <span class="hidden md:inline">Guardar</span></button>
+                    <button onclick="window.print()" class="bg-dcc-blue hover:bg-blue-900 text-white font-bold py-1 px-2 md:px-4 rounded shadow flex items-center gap-1">🖨️ <span class="hidden md:inline">Imprimir / PDF</span></button>
                 </div>
             </div>
         </header>
 
-        <main class="flex-1 flex overflow-hidden relative">
+        <!-- AREA DE TRABAJO (Layout de dos columnas forzado) -->
+        <main class="flex-1 flex flex-row overflow-hidden relative">
             
-            <!-- Sidebar: Biblioteca Operativa -->
-            <aside class="w-72 bg-white border-r border-gray-200 overflow-y-auto flex flex-col flex-none shadow-lg z-40">
-                <div class="p-4 flex-1">
-                    <h3 class="text-sm font-bold text-dcc-blue uppercase mb-3 border-b-2 border-dcc-orange pb-1">Biblioteca Operativa</h3>
+            <!-- Sidebar: Biblioteca Operativa (Fija a la Izquierda) -->
+            <aside class="w-48 md:w-72 bg-white border-r border-gray-200 overflow-y-auto flex flex-col flex-none shadow-lg z-40">
+                <div class="p-2 md:p-4 flex-1">
+                    <h3 class="text-xs md:text-sm font-bold text-dcc-blue uppercase mb-2 border-b-2 border-dcc-orange pb-1">Biblioteca Operativa</h3>
                     
-                    <div class="space-y-2 text-sm" id="resource-library">
-                        <div class="resource-item flex items-center bg-dcc-light p-2 rounded border border-orange-200" draggable="true" data-type="Voluntario" data-label="V">
-                            <span class="mr-3 w-8 flex justify-center">
-                                <svg viewBox="0 0 24 24" width="28" height="28" xmlns="http://www.w3.org/2000/svg">
+                    <p class="text-[9px] md:text-xs text-gray-500 mb-2 font-semibold no-print lg:hidden">👆 Toque un ícono y luego toque el mapa para ubicarlo.</p>
+
+                    <div class="space-y-1.5 text-xs md:text-sm" id="resource-library">
+                        <div class="resource-item flex items-center bg-dcc-light p-1.5 md:p-2 rounded border border-orange-200" draggable="true" data-type="Voluntario" data-label="V">
+                            <span class="mr-2 w-6 md:w-8 flex justify-center">
+                                <svg viewBox="0 0 24 24" class="w-5 h-5 md:w-7 md:h-7" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M4 11C4 6.58 7.58 3 12 3C16.42 3 20 6.58 20 11" fill="#FF6B00"/>
                                     <path d="M2 11H22" stroke="#FF6B00" stroke-width="2.5" stroke-linecap="round"/>
                                     <rect x="9" y="12" width="6" height="3" fill="#FFCC99" rx="1"/>
@@ -127,247 +141,294 @@
                                     <rect x="5" y="18" width="14" height="2.5" fill="#002855"/>
                                 </svg>
                             </span>
-                            <span class="font-bold text-dcc-blue">Voluntario / Unidad</span>
-                            <span class="ml-auto text-[10px] bg-dcc-orange text-white px-1 rounded" title="Apto para NFC">NFC</span>
+                            <span class="font-bold text-dcc-blue leading-tight">Voluntario / Unidad</span>
                         </div>
-                        <div class="resource-item flex items-center bg-gray-50 hover:bg-dcc-light p-2 rounded border border-gray-200" draggable="true" data-type="PC" data-label="PC">
-                            <span class="text-xl mr-3 w-8 text-center text-dcc-blue font-bold">★</span> <span class="font-semibold">Puesto de Comando</span>
+                        <div class="resource-item flex items-center bg-gray-50 hover:bg-dcc-light p-1.5 md:p-2 rounded border border-gray-200" draggable="true" data-type="PC" data-label="PC">
+                            <span class="text-base md:text-xl mr-2 w-6 md:w-8 text-center text-dcc-blue font-bold">★</span> <span class="font-semibold">Puesto de Comando</span>
                         </div>
-                        <div class="resource-item flex items-center bg-gray-50 hover:bg-dcc-light p-2 rounded border border-gray-200" draggable="true" data-type="Base" data-label="B">
-                            <span class="text-xl mr-3 w-8 text-center text-dcc-blue font-bold">⚑</span> <span class="font-semibold">Base Operativa</span>
+                        <div class="resource-item flex items-center bg-gray-50 hover:bg-dcc-light p-1.5 md:p-2 rounded border border-gray-200" draggable="true" data-type="Base" data-label="B">
+                            <span class="text-base md:text-xl mr-2 w-6 md:w-8 text-center text-dcc-blue font-bold">⚑</span> <span class="font-semibold">Base Operativa</span>
                         </div>
-                        <div class="resource-item flex items-center bg-gray-50 hover:bg-dcc-light p-2 rounded border border-gray-200" draggable="true" data-type="Logistica" data-label="L">
-                            <span class="text-xl mr-3 w-8 text-center">🚚</span> <span class="font-semibold">Logística</span>
+                        <div class="resource-item flex items-center bg-gray-50 hover:bg-dcc-light p-1.5 md:p-2 rounded border border-gray-200" draggable="true" data-type="Logistica" data-label="L">
+                            <span class="text-base md:text-xl mr-2 w-6 md:w-8 text-center">🚚</span> <span class="font-semibold">Logística</span>
                         </div>
-                        <div class="resource-item flex items-center bg-gray-50 hover:bg-dcc-light p-2 rounded border border-gray-200" draggable="true" data-type="Policia" data-label="PT">
-                            <span class="text-xl mr-3 w-8 text-center">🚓</span> <span class="font-semibold">Tránsito / Policía</span>
+                        <div class="resource-item flex items-center bg-gray-50 hover:bg-dcc-light p-1.5 md:p-2 rounded border border-gray-200" draggable="true" data-type="Policia" data-label="PT">
+                            <span class="text-base md:text-xl mr-2 w-6 md:w-8 text-center">🚓</span> <span class="font-semibold">Policía/Tránsito</span>
                         </div>
-                        <div class="resource-item flex items-center bg-gray-50 hover:bg-dcc-light p-2 rounded border border-gray-200" draggable="true" data-type="Dron" data-label="UAV">
-                            <span class="text-xl mr-3 w-8 text-center">🚁</span> <span class="font-semibold">Equipo Dron</span>
+                        <div class="resource-item flex items-center bg-gray-50 hover:bg-dcc-light p-1.5 md:p-2 rounded border border-gray-200" draggable="true" data-type="Dron" data-label="UAV">
+                            <span class="text-base md:text-xl mr-2 w-6 md:w-8 text-center">🚁</span> <span class="font-semibold">Equipo Dron</span>
                         </div>
-                        <div class="resource-item flex items-center bg-gray-50 hover:bg-dcc-light p-2 rounded border border-gray-200" draggable="true" data-type="Ambulancia" data-label="A">
-                            <span class="text-xl mr-3 w-8 text-center">🚑</span> <span class="font-semibold">Ambulancia</span>
+                        <div class="resource-item flex items-center bg-gray-50 hover:bg-dcc-light p-1.5 md:p-2 rounded border border-gray-200" draggable="true" data-type="Ambulancia" data-label="A">
+                            <span class="text-base md:text-xl mr-2 w-6 md:w-8 text-center">🚑</span> <span class="font-semibold">Ambulancia</span>
                         </div>
                     </div>
 
-                    <div class="mt-6">
-                        <h3 class="text-sm font-bold text-dcc-blue uppercase mb-3 border-b-2 border-dcc-orange pb-1">Herramientas</h3>
-                        <div class="space-y-3 text-sm">
+                    <div class="mt-4">
+                        <h3 class="text-xs md:text-sm font-bold text-dcc-blue uppercase mb-2 border-b-2 border-dcc-orange pb-1">Herramientas</h3>
+                        <div class="space-y-2 text-xs md:text-sm">
                             <div class="flex items-center justify-between">
                                 <label for="color-picker" class="font-semibold">Color:</label>
-                                <input type="color" id="color-picker" value="#FF6B00" class="w-10 h-8 p-0 border-0 rounded cursor-pointer">
+                                <input type="color" id="color-picker" value="#FF6B00" class="w-8 h-6 md:w-10 md:h-8 p-0 border-0 rounded cursor-pointer">
                             </div>
                             <div class="flex items-center justify-between">
                                 <label for="brush-size" class="font-semibold">Grosor:</label>
-                                <input type="range" id="brush-size" min="1" max="20" value="3" class="w-32 accent-dcc-orange">
+                                <input type="range" id="brush-size" min="1" max="20" value="3" class="w-24 md:w-32 accent-dcc-orange">
                             </div>
-                            <div class="grid grid-cols-2 gap-2">
-                                <button id="pen-tool" class="tool-btn active-tool p-2 rounded border font-semibold">✏️ Lápiz</button>
-                                <button id="eraser-tool" class="tool-btn p-2 rounded border font-semibold bg-gray-50 text-gray-700">🧼 Borrar</button>
+                            <div class="grid grid-cols-2 gap-1 md:gap-2">
+                                <button id="pen-tool" class="tool-btn active-tool p-1 md:p-2 rounded border font-semibold text-[10px] md:text-xs">✏️ Lápiz</button>
+                                <button id="eraser-tool" class="tool-btn p-1 md:p-2 rounded border font-semibold bg-gray-50 text-gray-700 text-[10px] md:text-xs">🧼 Borrar</button>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="p-4 bg-dcc-light border-t space-y-2">
-                    <button id="btn-generate-nfc" class="w-full bg-dcc-blue text-white font-bold py-2 px-4 rounded text-xs shadow hover:bg-blue-800 transition mb-2">
-                        🔗 Generar URL para Tag NFC
+                <div class="p-2 md:p-4 bg-dcc-light border-t space-y-1.5 md:space-y-2">
+                    <button id="btn-generate-nfc" class="w-full bg-dcc-blue text-white font-bold py-1.5 md:py-2 px-2 rounded text-[10px] md:text-xs shadow hover:bg-blue-800 transition">
+                        🔗 Generar URL NFC
                     </button>
-                    <input type="file" id="map-upload-input" class="hidden" accept="image/*">
-                    <button id="map-upload-btn" class="w-full bg-dcc-orange text-white font-bold py-2 px-4 rounded hover:bg-orange-600 transition text-sm flex justify-center items-center gap-2 shadow">
-                        📷 Cargar Plano (Fondo)
-                    </button>
-                    <div class="flex gap-2">
-                        <button id="clear-drawings" class="w-1/2 bg-gray-600 text-white font-bold py-2 px-2 rounded hover:bg-gray-700 text-xs shadow">Limpiar Trazos</button>
-                        <button id="clear-board" class="w-1/2 bg-red-600 text-white font-bold py-2 px-2 rounded hover:bg-red-700 text-xs shadow">Limpiar Todo</button>
+                    <div class="flex gap-1 md:gap-2">
+                        <button id="clear-drawings" class="w-1/2 bg-gray-600 text-white font-bold py-1.5 px-1 rounded text-[9px] md:text-xs shadow">Limpiar Trazos</button>
+                        <button id="clear-board" class="w-1/2 bg-red-600 text-white font-bold py-1.5 px-1 rounded text-[9px] md:text-xs shadow">Limpiar Todo</button>
                     </div>
                 </div>
             </aside>
 
-            <!-- Contenido Principal (Formularios y Tablero) -->
-            <section class="flex-1 overflow-y-auto p-4 flex flex-col gap-4 bg-gray-100" id="main-content-area">
+            <!-- Contenido Principal Derecha (Tablero y Formularios Desplegables) -->
+            <section class="flex-1 overflow-y-auto p-2 md:p-4 flex flex-col gap-3 md:gap-4 bg-gray-100" id="main-content-area">
                 
-                <!-- Datos del Incidente (SCI 201 Expandido Modular) -->
-                <div class="section-card relative">
-                    <div class="flex justify-between items-center mb-4 border-b-2 border-dcc-orange pb-2">
-                        <h2 class="text-lg font-bold text-dcc-blue">Información y Organización del Incidente (SCI 201)</h2>
-                        <img src="https://www.defensacivil.gov.co/_templates/DEFCIVIL-PORTAL-2020/recursos/images/cabezote/Logo-Defensoria-Civil.png" alt="Logo DCC" class="h-10 object-contain drop-shadow-sm">
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm mb-4">
-                        <div class="md:col-span-2">
-                            <label class="block font-bold text-gray-700 mb-1">Nombre del Incidente</label>
-                            <input type="text" id="incidente-nombre" class="w-full p-2 border border-gray-300 rounded focus:ring-dcc-orange outline-none" placeholder="Ej. Incendio Forestal Cerro...">
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="block font-bold text-dcc-blue mb-1">Elaborado por (Responsable)</label>
-                            <input type="text" id="incidente-responsable" class="w-full p-2 border border-dcc-orange bg-orange-50 rounded font-semibold outline-none" placeholder="Nombre completo o indicativo...">
-                        </div>
-                        <div class="md:col-span-2 grid grid-cols-2 gap-2">
-                            <div><label class="block font-bold text-gray-700 mb-1">Periodo (Inicio)</label><input type="datetime-local" id="incidente-inicio" class="w-full p-2 border border-gray-300 rounded outline-none"></div>
-                            <div><label class="block font-bold text-gray-700 mb-1">Periodo (Fin)</label><input type="datetime-local" id="incidente-fin" class="w-full p-2 border border-gray-300 rounded outline-none"></div>
+                <!-- Datos del Incidente (SCI 201 Expandido Modular PLEGABLE) -->
+                <div class="section-card relative py-2 px-3 md:p-6">
+                    <div class="flex justify-between items-center border-b-2 border-dcc-orange pb-2">
+                        <h2 class="text-sm md:text-lg font-bold text-dcc-blue">Organización del Incidente (SCI 201)</h2>
+                        <div class="flex items-center gap-2">
+                            <button onclick="document.getElementById('sci201-content').classList.toggle('hidden')" class="bg-dcc-light border border-dcc-orange text-dcc-blue px-2 md:px-3 py-1 rounded text-[10px] md:text-xs font-bold shadow-sm hover:bg-dcc-orange hover:text-white transition no-print">
+                                👁️ Abrir / Cerrar
+                            </button>
+                            <img src="https://www.defensacivil.gov.co/_templates/DEFCIVIL-PORTAL-2020/recursos/images/cabezote/Logo-Defensoria-Civil.png" alt="Logo DCC" class="h-6 md:h-10 object-contain drop-shadow-sm hidden md:block">
                         </div>
                     </div>
 
-                    <!-- Módulo de Staff y Jefes de Sección con Aplica/No Aplica -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <!-- Staff de Comando -->
-                        <div class="bg-gray-50 p-3 rounded border border-gray-200 shadow-inner">
+                    <!-- CONTENEDOR PLEGABLE -->
+                    <div id="sci201-content" class="hidden lg:block mt-3 md:mt-4">
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4 text-sm mb-4 bg-orange-50/50 p-2 md:p-3 rounded border border-orange-100">
+                            <div>
+                                <label class="block text-xs md:text-sm font-bold text-dcc-blue mb-1">Seccional (Grupo)</label>
+                                <input type="text" id="incidente-seccional" class="w-full p-1.5 md:p-2 border border-gray-300 rounded focus:ring-dcc-orange outline-none text-xs md:text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs md:text-sm font-bold text-dcc-blue mb-1">Junta o Comité</label>
+                                <input type="text" id="incidente-junta" class="w-full p-1.5 md:p-2 border border-gray-300 rounded focus:ring-dcc-orange outline-none text-xs md:text-sm">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-2 md:gap-4 text-xs md:text-sm mb-4">
+                            <div class="md:col-span-2">
+                                <label class="block font-bold text-gray-700 mb-1">Nombre del Incidente</label>
+                                <input type="text" id="incidente-nombre" class="w-full p-1.5 md:p-2 border border-gray-300 rounded focus:ring-dcc-orange outline-none">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block font-bold text-dcc-blue mb-1">Elaborado por (Responsable)</label>
+                                <input type="text" id="incidente-responsable" class="w-full p-1.5 md:p-2 border border-dcc-orange bg-orange-50 rounded font-semibold outline-none">
+                            </div>
+                            <div class="md:col-span-2 grid grid-cols-2 gap-2">
+                                <div><label class="block font-bold text-gray-700 mb-1">Inicio Periodo</label><input type="datetime-local" id="incidente-inicio" class="w-full p-1.5 border border-gray-300 rounded outline-none text-[10px] md:text-sm"></div>
+                                <div><label class="block font-bold text-gray-700 mb-1">Fin Periodo</label><input type="datetime-local" id="incidente-fin" class="w-full p-1.5 border border-gray-300 rounded outline-none text-[10px] md:text-sm"></div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
+                            <!-- Staff de Comando -->
+                            <div class="bg-gray-50 p-2 md:p-3 rounded border border-gray-200 shadow-inner">
+                                <div class="flex justify-between items-center mb-2 border-b border-gray-300 pb-1">
+                                    <label class="block text-sm font-bold text-gray-800">Staff de Comando</label>
+                                    <span class="text-[10px] text-gray-500 font-bold no-print">Aplica</span>
+                                </div>
+                                <div class="grid grid-cols-1 gap-2 text-[10px] md:text-xs" id="staff-inputs">
+                                    <div class="flex items-center gap-1 md:gap-2">
+                                        <input type="checkbox" checked disabled class="w-3 h-3 md:w-4 md:h-4 accent-dcc-orange opacity-50">
+                                        <span class="w-1/3 font-bold text-dcc-blue">Comandante: *</span>
+                                        <input type="text" id="staff-comandante" class="w-2/3 p-1 md:p-1.5 border border-gray-300 rounded outline-none bg-white">
+                                    </div>
+                                    <div class="flex items-center gap-1 md:gap-2">
+                                        <input type="checkbox" id="chk-seguridad" checked class="w-3 h-3 md:w-4 md:h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)">
+                                        <span class="w-1/3 font-semibold text-gray-700">Seguridad:</span>
+                                        <input type="text" id="staff-seguridad" class="w-2/3 p-1 md:p-1.5 border border-gray-300 rounded outline-none bg-white">
+                                    </div>
+                                    <div class="flex items-center gap-1 md:gap-2">
+                                        <input type="checkbox" id="chk-informacion" checked class="w-3 h-3 md:w-4 md:h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)">
+                                        <span class="w-1/3 font-semibold text-gray-700">Información:</span>
+                                        <input type="text" id="staff-informacion" class="w-2/3 p-1 md:p-1.5 border border-gray-300 rounded outline-none bg-white">
+                                    </div>
+                                    <div class="flex items-center gap-1 md:gap-2">
+                                        <input type="checkbox" id="chk-enlace" checked class="w-3 h-3 md:w-4 md:h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)">
+                                        <span class="w-1/3 font-semibold text-gray-700">Enlace:</span>
+                                        <input type="text" id="staff-enlace" class="w-2/3 p-1 md:p-1.5 border border-gray-300 rounded outline-none bg-white">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Jefes de Sección -->
+                            <div class="bg-gray-50 p-2 md:p-3 rounded border border-gray-200 shadow-inner">
+                                <div class="flex justify-between items-center mb-2 border-b border-gray-300 pb-1">
+                                    <label class="block text-sm font-bold text-gray-800">Staff General (Secciones)</label>
+                                    <span class="text-[10px] text-gray-500 font-bold no-print">Aplica</span>
+                                </div>
+                                <div class="grid grid-cols-1 gap-2 text-[10px] md:text-xs" id="secciones-inputs">
+                                    <div class="flex items-center gap-1 md:gap-2">
+                                        <input type="checkbox" id="chk-operaciones" checked class="w-3 h-3 md:w-4 md:h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)">
+                                        <span class="w-1/3 font-semibold text-gray-700">Operaciones:</span>
+                                        <input type="text" id="sec-operaciones" class="w-2/3 p-1 md:p-1.5 border border-gray-300 rounded outline-none bg-white">
+                                    </div>
+                                    <div class="flex items-center gap-1 md:gap-2">
+                                        <input type="checkbox" id="chk-planificacion" checked class="w-3 h-3 md:w-4 md:h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)">
+                                        <span class="w-1/3 font-semibold text-gray-700">Planificación:</span>
+                                        <input type="text" id="sec-planificacion" class="w-2/3 p-1 md:p-1.5 border border-gray-300 rounded outline-none bg-white">
+                                    </div>
+                                    <div class="flex items-center gap-1 md:gap-2">
+                                        <input type="checkbox" id="chk-logistica" checked class="w-3 h-3 md:w-4 md:h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)">
+                                        <span class="w-1/3 font-semibold text-gray-700">Logística:</span>
+                                        <input type="text" id="sec-logistica" class="w-2/3 p-1 md:p-1.5 border border-gray-300 rounded outline-none bg-white">
+                                    </div>
+                                    <div class="flex items-center gap-1 md:gap-2">
+                                        <input type="checkbox" id="chk-admin" checked class="w-3 h-3 md:w-4 md:h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)">
+                                        <span class="w-1/3 font-semibold text-gray-700">Admin/Finanz:</span>
+                                        <input type="text" id="sec-admin" class="w-2/3 p-1 md:p-1.5 border border-gray-300 rounded outline-none bg-white">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Grupos Dinámicos con Tags -->
+                        <div class="bg-gray-50 p-2 rounded border border-gray-200 flex flex-col mt-3 md:mt-4">
                             <div class="flex justify-between items-center mb-2 border-b border-gray-300 pb-1">
-                                <label class="block font-bold text-gray-800">Staff de Comando</label>
-                                <span class="text-[10px] text-gray-500 font-bold no-print">Aplica</span>
+                                <label class="block text-sm font-bold text-gray-800">Recursos: Grupos y Fuerzas de Tarea</label>
+                                <button onclick="addGroup()" class="bg-dcc-blue text-white px-2 py-1 rounded text-[10px] font-bold no-print shadow hover:bg-blue-800">+ Añadir Grupo</button>
                             </div>
-                            <div class="grid grid-cols-1 gap-2 text-xs" id="staff-inputs">
-                                <div class="flex items-center gap-2">
-                                    <input type="checkbox" checked disabled class="w-4 h-4 accent-dcc-orange opacity-50" title="Obligatorio">
-                                    <span class="w-1/3 font-bold text-dcc-blue">Comandante (CI): *</span>
-                                    <input type="text" id="staff-comandante" class="w-2/3 p-1.5 border border-gray-300 rounded outline-none focus:border-dcc-orange bg-white" placeholder="Persona que asume el mando...">
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <input type="checkbox" id="chk-seguridad" checked class="w-4 h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)">
-                                    <span class="w-1/3 font-semibold text-gray-700">Of. Seguridad:</span>
-                                    <input type="text" id="staff-seguridad" class="w-2/3 p-1.5 border border-gray-300 rounded outline-none focus:border-dcc-orange bg-white transition-colors" placeholder="Nombre...">
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <input type="checkbox" id="chk-informacion" checked class="w-4 h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)">
-                                    <span class="w-1/3 font-semibold text-gray-700">Of. Información:</span>
-                                    <input type="text" id="staff-informacion" class="w-2/3 p-1.5 border border-gray-300 rounded outline-none focus:border-dcc-orange bg-white transition-colors" placeholder="Nombre...">
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <input type="checkbox" id="chk-enlace" checked class="w-4 h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)">
-                                    <span class="w-1/3 font-semibold text-gray-700">Of. Enlace:</span>
-                                    <input type="text" id="staff-enlace" class="w-2/3 p-1.5 border border-gray-300 rounded outline-none focus:border-dcc-orange bg-white transition-colors" placeholder="Nombre...">
-                                </div>
+                            <div id="grupos-container" class="space-y-2 flex-1 max-h-40 overflow-y-auto pr-1">
+                                <!-- Elementos de grupo -->
                             </div>
-                        </div>
-
-                        <!-- Jefes de Sección -->
-                        <div class="bg-gray-50 p-3 rounded border border-gray-200 shadow-inner">
-                            <div class="flex justify-between items-center mb-2 border-b border-gray-300 pb-1">
-                                <label class="block font-bold text-gray-800">Jefes de Sección (Staff General)</label>
-                                <span class="text-[10px] text-gray-500 font-bold no-print">Aplica</span>
-                            </div>
-                            <div class="grid grid-cols-1 gap-2 text-xs" id="secciones-inputs">
-                                <div class="flex items-center gap-2">
-                                    <input type="checkbox" id="chk-operaciones" checked class="w-4 h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)">
-                                    <span class="w-1/3 font-semibold text-gray-700">Operaciones:</span>
-                                    <input type="text" id="sec-operaciones" class="w-2/3 p-1.5 border border-gray-300 rounded outline-none focus:border-dcc-orange bg-white transition-colors" placeholder="Nombre...">
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <input type="checkbox" id="chk-planificacion" checked class="w-4 h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)">
-                                    <span class="w-1/3 font-semibold text-gray-700">Planificación:</span>
-                                    <input type="text" id="sec-planificacion" class="w-2/3 p-1.5 border border-gray-300 rounded outline-none focus:border-dcc-orange bg-white transition-colors" placeholder="Nombre...">
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <input type="checkbox" id="chk-logistica" checked class="w-4 h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)">
-                                    <span class="w-1/3 font-semibold text-gray-700">Logística:</span>
-                                    <input type="text" id="sec-logistica" class="w-2/3 p-1.5 border border-gray-300 rounded outline-none focus:border-dcc-orange bg-white transition-colors" placeholder="Nombre...">
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <input type="checkbox" id="chk-admin" checked class="w-4 h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)">
-                                    <span class="w-1/3 font-semibold text-gray-700">Admin/Finanzas:</span>
-                                    <input type="text" id="sec-admin" class="w-2/3 p-1.5 border border-gray-300 rounded outline-none focus:border-dcc-orange bg-white transition-colors" placeholder="Nombre...">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Grupos Dinámicos con Tags -->
-                    <div class="bg-gray-50 p-2 rounded border border-gray-200 flex flex-col mt-4">
-                        <div class="flex justify-between items-center mb-2 border-b border-gray-300 pb-1">
-                            <label class="block font-bold text-gray-800">Recursos: Grupos y Fuerzas de Tarea</label>
-                            <button onclick="addGroup()" class="bg-dcc-blue text-white px-2 py-1 rounded text-[10px] font-bold no-print transition hover:bg-blue-800 shadow">+ Añadir Grupo</button>
-                        </div>
-                        <div id="grupos-container" class="space-y-2 flex-1 max-h-48 overflow-y-auto pr-1">
-                            <!-- Elementos de grupo dinámicos -->
                         </div>
                     </div>
                 </div>
 
-                <!-- Tablero y Mapa (Ubicado antes del Plan de Acción) -->
-                <div class="section-card flex-1 min-h-[500px] flex flex-col p-0 overflow-hidden border-2 border-gray-300">
-                    <div class="bg-gray-200 flex border-b border-gray-300 no-print">
-                        <button id="tab-canvas-btn" class="px-6 py-3 font-bold text-dcc-blue bg-white border-t-4 border-dcc-orange">✏️ Plano Local (Pizarra)</button>
-                        <button id="tab-map-btn" class="px-6 py-3 font-bold text-gray-600 hover:bg-gray-100 border-t-4 border-transparent flex items-center gap-2">
-                            🌍 Mapa Georreferenciado
-                            <span class="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full animate-pulse shadow">GPS Real</span>
+                <!-- Tablero y Mapa Táctico -->
+                <div class="section-card flex-1 min-h-[350px] md:min-h-[500px] flex flex-col p-0 overflow-hidden border-2 border-gray-300 relative group">
+                    
+                    <!-- Barra superior del Mapa -->
+                    <div class="bg-gray-200 flex justify-between items-center border-b border-gray-300 no-print">
+                        <div class="flex">
+                            <button id="tab-canvas-btn" class="px-3 md:px-6 py-2 md:py-3 font-bold text-[10px] md:text-sm text-dcc-blue bg-white border-t-4 border-dcc-orange text-center">✏️ Pizarra Local</button>
+                            <button id="tab-map-btn" class="px-3 md:px-6 py-2 md:py-3 font-bold text-[10px] md:text-sm text-gray-600 hover:bg-gray-100 border-t-4 border-transparent flex items-center justify-center gap-1">
+                                🌍 Mapa GPS <span class="bg-red-500 text-white text-[8px] px-1 rounded-full animate-pulse shadow">En vivo</span>
+                            </button>
+                        </div>
+                        <!-- NUEVO BOTÓN: Cargar Plano directo en el mapa -->
+                        <button id="quick-map-upload-btn" class="bg-dcc-orange hover:bg-orange-600 text-white px-2 md:px-3 py-1.5 md:py-2 m-1 md:m-1.5 rounded text-[10px] md:text-xs font-bold shadow flex items-center gap-1 transition">
+                            📷 Cargar Plano (Fondo)
                         </button>
                     </div>
 
-                    <div id="canvas-container" class="relative w-full flex-1 bg-gray-100 overflow-hidden">
+                    <div id="canvas-container" class="relative w-full flex-1 bg-gray-100 overflow-hidden outline-none" tabindex="0">
                         <canvas id="map-canvas" class="absolute top-0 left-0 w-full h-full"></canvas>
                         <canvas id="grid-canvas" class="absolute top-0 left-0 w-full h-full pointer-events-none"></canvas>
                         <canvas id="objects-canvas" class="absolute top-0 left-0 w-full h-full pointer-events-none"></canvas>
                         <canvas id="drawing-canvas" class="absolute top-0 left-0 w-full h-full" style="touch-action: none;"></canvas>
+                        <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-50 hidden group-focus-within:flex" id="paste-hint">
+                            <span class="bg-black text-white px-4 py-2 rounded-full text-xs font-bold">Puede pegar (Ctrl+V) una imagen aquí</span>
+                        </div>
                     </div>
 
                     <div id="leaflet-container" class="relative w-full flex-1 hidden">
                         <div id="mapid" class="absolute top-0 left-0 w-full h-full z-10"></div>
-                        <div class="absolute bottom-4 left-4 z-[400] bg-white p-2 rounded shadow text-xs border border-dcc-orange">
-                            <h4 class="font-bold text-dcc-blue mb-1">Voluntarios Conectados (En vivo)</h4>
-                            <ul id="live-users-list" class="text-gray-600 max-h-24 overflow-y-auto pl-4 list-disc">
-                                <li class="text-gray-400 italic">Esperando conexiones GPS...</li>
+                        <div class="absolute bottom-4 left-4 z-[400] bg-white p-2 rounded shadow text-xs border border-dcc-orange max-w-[200px]">
+                            <h4 class="font-bold text-dcc-blue mb-1 text-[10px] md:text-xs">Unidades Conectadas</h4>
+                            <ul id="live-users-list" class="text-gray-600 max-h-24 overflow-y-auto pl-3 list-disc text-[9px] md:text-xs">
+                                <li class="text-gray-400 italic">Esperando GPS...</li>
                             </ul>
                         </div>
                     </div>
                 </div>
 
-                <!-- Objetivos y Tácticas (SCI 202 - Reubicado debajo del mapa) -->
-                <div class="section-card">
+                <!-- Objetivos y Tácticas (SCI 202) -->
+                <div class="section-card py-2 px-3 md:p-6">
                     <div class="flex justify-between items-center mb-3 border-b-2 border-dcc-orange pb-2">
-                        <h2 class="text-lg font-bold text-dcc-blue">Plan de Acción: Objetivos y Tácticas (SCI 202)</h2>
-                        <button onclick="addObjective()" class="bg-dcc-orange text-white px-3 py-1 rounded text-xs font-bold shadow no-print transition hover:bg-orange-600">+ Nuevo Objetivo</button>
+                        <h2 class="text-sm md:text-lg font-bold text-dcc-blue">Plan de Acción: Objetivos (SCI 202)</h2>
+                        <button onclick="addObjective()" class="bg-dcc-orange text-white px-2 py-1 md:px-3 md:py-1 rounded text-[10px] md:text-xs font-bold shadow no-print">+ Objetivo</button>
                     </div>
                     <div id="objetivos-container" class="space-y-3">
-                        <!-- Elementos de objetivos dinámicos -->
+                        <!-- Objetivos -->
                     </div>
                 </div>
 
                 <!-- Tablas 207 y 211 -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <div class="section-card">
-                        <div class="flex justify-between items-center mb-4 border-b-2 border-red-500 pb-2">
-                            <h2 class="text-lg font-bold text-red-700">SCI 207 - Pacientes</h2>
-                            <button onclick="addPatientRow()" class="bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 px-2 py-1 rounded text-xs font-bold no-print shadow-sm">+ Herido</button>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4 mb-4">
+                    <div class="section-card py-2 px-3 md:p-6">
+                        <div class="flex justify-between items-center mb-2 md:mb-4 border-b-2 border-red-500 pb-2">
+                            <h2 class="text-sm md:text-lg font-bold text-red-700">SCI 207 - Pacientes</h2>
+                            <button onclick="addPatientRow()" class="bg-red-50 text-red-700 border border-red-200 px-2 py-1 rounded text-[10px] md:text-xs font-bold no-print shadow-sm">+ Herido</button>
                         </div>
                         <div class="table-container overflow-x-auto max-h-60">
-                            <table class="w-full text-sm text-left text-gray-600">
-                                <thead class="text-xs uppercase bg-gray-50 sticky top-0">
-                                    <tr><th class="px-2 py-2">ID/Nombre</th><th class="px-2 py-2">Condición</th><th class="px-2 py-2 w-24">Triage</th><th class="px-2 py-2">Traslado</th><th class="w-6 no-print"></th></tr>
+                            <table class="w-full text-xs md:text-sm text-left text-gray-600">
+                                <thead class="uppercase bg-gray-50 sticky top-0">
+                                    <tr>
+                                        <th class="px-1 md:px-2 py-1 md:py-2">Nombre</th>
+                                        <th class="px-1 md:px-2 py-1 md:py-2 w-20 md:w-24">Cédula</th>
+                                        <th class="px-1 md:px-2 py-1 md:py-2">Condición</th>
+                                        <th class="px-1 md:px-2 py-1 md:py-2 w-20 md:w-24">Triage</th>
+                                        <th class="px-1 md:px-2 py-1 md:py-2">Traslado</th>
+                                        <th class="w-6 no-print"></th>
+                                    </tr>
                                 </thead>
                                 <tbody id="sci207-body"></tbody>
                             </table>
                         </div>
                     </div>
 
-                    <div class="section-card">
-                        <div class="flex justify-between items-center mb-4 border-b-2 border-dcc-blue pb-2">
-                            <h2 class="text-lg font-bold text-dcc-blue">SCI 211 - Bitácora</h2>
-                            <button onclick="addLogEntry()" class="bg-blue-50 text-dcc-blue border border-blue-200 hover:bg-blue-100 px-2 py-1 rounded text-xs font-bold no-print shadow-sm">+ Evento</button>
+                    <div class="section-card py-2 px-3 md:p-6">
+                        <div class="flex justify-between items-center mb-2 md:mb-4 border-b-2 border-dcc-blue pb-2">
+                            <h2 class="text-sm md:text-lg font-bold text-dcc-blue">SCI 211 - Bitácora</h2>
+                            <button onclick="addLogEntry()" class="bg-blue-50 text-dcc-blue border border-blue-200 px-2 py-1 rounded text-[10px] md:text-xs font-bold no-print shadow-sm">+ Evento</button>
                         </div>
                         <div class="table-container overflow-x-auto max-h-60">
-                            <table class="w-full text-sm text-left text-gray-600">
-                                <thead class="text-xs uppercase bg-gray-50 sticky top-0">
-                                    <tr><th class="px-2 py-2 w-20">Hora</th><th class="px-2 py-2">Actividad</th><th class="px-2 py-2">Responsable</th><th class="w-6 no-print"></th></tr>
+                            <table class="w-full text-xs md:text-sm text-left text-gray-600">
+                                <thead class="uppercase bg-gray-50 sticky top-0">
+                                    <tr><th class="px-1 md:px-2 py-1 md:py-2 w-16 md:w-20">Hora</th><th class="px-1 md:px-2 py-1 md:py-2">Actividad</th><th class="px-1 md:px-2 py-1 md:py-2">Responsable</th><th class="w-6 no-print"></th></tr>
                                 </thead>
                                 <tbody id="sci211-body"></tbody>
                             </table>
                         </div>
                     </div>
                 </div>
+
+                <!-- NUEVO: Módulo de Registro Fotográfico y Evidencias -->
+                <div class="section-card py-2 px-3 md:p-6 mb-8">
+                    <div class="flex justify-between items-center mb-2 md:mb-4 border-b-2 border-dcc-blue pb-2">
+                        <h2 class="text-sm md:text-lg font-bold text-dcc-blue">Registro Fotográfico y Evidencias</h2>
+                        <!-- Botón para tomar foto (usará cámara en celular) -->
+                        <button onclick="document.getElementById('evidence-upload').click()" class="bg-dcc-orange hover:bg-orange-600 text-white px-3 py-1.5 md:py-2 rounded text-[10px] md:text-xs font-bold shadow-sm flex items-center gap-1 transition no-print">
+                            📸 Tomar / Subir Foto
+                        </button>
+                    </div>
+                    <div id="evidences-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                        <!-- Evidencias dinámicas -->
+                    </div>
+                    <p id="no-evidences-msg" class="text-center text-xs text-gray-400 italic py-4">Aún no hay fotografías registradas.</p>
+                </div>
+
             </section>
         </main>
     </div>
 
     <!-- Modales -->
     
-    <!-- Modal para Selección de Voluntario al arrastrar -->
-    <div id="volunteer-modal" class="hidden fixed inset-0 z-[250] bg-black/50 flex items-center justify-center p-4">
+    <!-- Modal para Selección de Voluntario al arrastrar/tocar -->
+    <div id="volunteer-modal" class="hidden fixed inset-0 z-[250] bg-black/60 flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm border-t-4 border-dcc-orange">
-            <h3 class="text-lg font-bold text-dcc-blue mb-2">Asignar Voluntario a Ubicación</h3>
-            <p class="text-xs text-gray-600 mb-4">Seleccione un voluntario de los grupos operativos o ingrese uno nuevo.</p>
+            <h3 class="text-lg font-bold text-dcc-blue mb-2">Asignar Unidad a Ubicación</h3>
+            <p class="text-xs text-gray-600 mb-4">Seleccione el voluntario del listado operativo o ingrese uno nuevo.</p>
             
-            <label class="block text-xs font-bold text-gray-700 mb-1">Voluntario / Unidad:</label>
+            <label class="block text-xs font-bold text-gray-700 mb-1">Voluntario / Grupo:</label>
             <select id="vol-modal-select" class="w-full p-2 border border-gray-300 rounded mb-2 text-sm outline-none focus:border-dcc-orange">
                 <!-- Opciones cargadas dinámicamente -->
             </select>
@@ -376,18 +437,18 @@
             
             <div class="flex justify-end gap-2 mt-4">
                 <button id="btn-cancel-vol" class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded text-sm font-bold transition">Cancelar</button>
-                <button id="btn-confirm-vol" class="px-3 py-1.5 bg-dcc-orange hover:bg-orange-600 text-white rounded text-sm font-bold shadow transition">Asignar en Mapa</button>
+                <button id="btn-confirm-vol" class="px-3 py-1.5 bg-dcc-orange hover:bg-orange-600 text-white rounded text-sm font-bold shadow transition">Ubicar en Mapa</button>
             </div>
         </div>
     </div>
 
     <!-- Modal NFC -->
-    <div id="nfc-modal" class="hidden fixed inset-0 z-[200] bg-black/50 flex items-center justify-center p-4">
+    <div id="nfc-modal" class="hidden fixed inset-0 z-[200] bg-black/60 flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md border-t-4 border-dcc-blue">
-            <h3 class="text-xl font-bold text-dcc-blue mb-4">Generar Enlace para Etiqueta NFC</h3>
-            <p class="text-sm text-gray-600 mb-4">Escriba este enlace en una etiqueta NFC. Cuando el voluntario acerque su dispositivo (con internet), su ubicación GPS se transmitirá a este Centro de Comando.</p>
-            <label class="block text-sm font-bold text-gray-700 mb-1">Indicativo del Voluntario:</label>
-            <input type="text" id="nfc-vol-name" class="w-full p-2 border border-gray-300 rounded mb-4 focus:border-dcc-orange outline-none" placeholder="Ej. Unidad Alfa">
+            <h3 class="text-xl font-bold text-dcc-blue mb-4">Generar Enlace para Tag NFC</h3>
+            <p class="text-sm text-gray-600 mb-4">Grabe este enlace en una etiqueta NFC. Al escanearla, el voluntario transmitirá su ubicación GPS al Puesto de Comando.</p>
+            <label class="block text-sm font-bold text-gray-700 mb-1">Indicativo de la Unidad:</label>
+            <input type="text" id="nfc-vol-name" class="w-full p-2 border border-gray-300 rounded mb-4 focus:border-dcc-orange outline-none" placeholder="Ej. Escuadra Alfa">
             <textarea id="nfc-url-output" class="w-full p-2 bg-gray-100 border border-gray-300 rounded text-xs text-gray-500 mb-4" rows="3" readonly></textarea>
             <div class="flex justify-end gap-2">
                 <button id="btn-close-nfc" class="px-4 py-2 bg-gray-200 text-gray-800 hover:bg-gray-300 rounded font-bold transition">Cerrar</button>
@@ -396,7 +457,10 @@
         </div>
     </div>
 
-    <!-- Scripts -->
+    <!-- Input Oculto para Evidencias -->
+    <input type="file" id="evidence-upload" accept="image/*" capture="environment" class="hidden no-print">
+
+    <!-- Scripts (Firebase, Lógica y Tácticas Adaptativas) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -404,21 +468,18 @@
 
         document.addEventListener('DOMContentLoaded', async () => {
             
-            // --- VERIFICAR MODO DE VISTA (Rastreador vs Comando) ---
+            // --- MODO RASTREADOR (NFC) ---
             const urlParams = new URLSearchParams(window.location.search);
             const isTrackerMode = urlParams.get('tracker') === 'true';
             const volunteerName = urlParams.get('name') || 'Voluntario Anónimo';
 
-            const trackerUI = document.getElementById('tracker-mode-ui');
-            const commandUI = document.getElementById('command-center-ui');
-
             if (isTrackerMode) {
-                trackerUI.classList.remove('hidden');
-                commandUI.classList.add('hidden');
+                document.getElementById('tracker-mode-ui').classList.remove('hidden');
+                document.getElementById('command-center-ui').classList.add('hidden');
                 document.getElementById('tracker-volunteer-name').innerText = `Unidad: ${volunteerName}`;
             }
 
-            // --- INICIALIZACIÓN FIREBASE (Para Rastreo GPS Real) ---
+            // --- FIREBASE (GPS Real) ---
             let db, auth, appId;
             try {
                 const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
@@ -426,22 +487,13 @@
 
                 if (firebaseConfig && Object.keys(firebaseConfig).length > 0) {
                     const app = initializeApp(firebaseConfig);
-                    auth = getAuth(app);
-                    db = getFirestore(app);
-
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-
-                    onAuthStateChanged(auth, (user) => {
-                        if(user && !isTrackerMode) initCommandCenterGPS();
-                    });
+                    auth = getAuth(app); db = getFirestore(app);
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { await signInWithCustomToken(auth, __initial_auth_token); } 
+                    else { await signInAnonymously(auth); }
+                    onAuthStateChanged(auth, (user) => { if(user && !isTrackerMode) initCommandCenterGPS(); });
                 }
-            } catch(err) { console.warn("Firebase no inicializado. GPS remoto inactivo.", err); }
+            } catch(err) { console.warn("GPS remoto inactivo.", err); }
 
-            // --- LÓGICA MODO RASTREADOR ---
             let watchId = null;
             const toggleTrackBtn = document.getElementById('toggle-tracking-btn');
             const ring = document.getElementById('gps-status-ring');
@@ -456,14 +508,10 @@
 
                             watchId = navigator.geolocation.watchPosition(async (position) => {
                                 if(!db || !auth.currentUser) return;
-                                const lat = position.coords.latitude; const lng = position.coords.longitude;
-                                const locData = { name: volunteerName, lat, lng, timestamp: Date.now() };
-                                try {
-                                    const userDoc = doc(db, 'artifacts', appId, 'public', 'data', 'locations', auth.currentUser.uid);
-                                    await setDoc(userDoc, locData);
-                                } catch (e) { console.error("Error transmitiendo GPS", e); }
-                            }, (err) => { alert("Error obteniendo GPS: " + err.message); }, { enableHighAccuracy: true, maximumAge: 0 });
-                        } else { alert("Navegador no soporta geolocalización."); }
+                                const locData = { name: volunteerName, lat: position.coords.latitude, lng: position.coords.longitude, timestamp: Date.now() };
+                                try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'locations', auth.currentUser.uid), locData); } catch (e) {}
+                            }, (err) => { alert("Error GPS: " + err.message); }, { enableHighAccuracy: true, maximumAge: 0 });
+                        } else { alert("Navegador no soporta GPS."); }
                     } else {
                         navigator.geolocation.clearWatch(watchId); watchId = null;
                         toggleTrackBtn.innerText = "Iniciar Transmisión GPS";
@@ -475,264 +523,137 @@
 
             if (isTrackerMode) return;
 
-            // --- FUNCIONES AUXILIARES Y MODULARES GLOBALES ---
-            window.getAvailableVolunteers = function() {
-                const badges = document.querySelectorAll('.member-badge-text');
-                return [...new Set(Array.from(badges).map(b => b.innerText.trim()))];
+            // --- FUNCIONES MODULARES ---
+            window.getAvailableVolunteers = () => [...new Set(Array.from(document.querySelectorAll('.member-badge-text')).map(b => b.innerText.trim()))];
+            window.toggleRoleInput = (chk) => {
+                const inp = chk.parentElement.querySelector('input[type="text"]');
+                if(chk.checked) { inp.disabled = false; inp.classList.replace('bg-gray-200','bg-white'); if(inp.value==='N/A') inp.value=''; } 
+                else { inp.disabled = true; inp.classList.replace('bg-white','bg-gray-200'); inp.value='N/A'; }
             };
 
-            window.toggleRoleInput = function(checkbox) {
-                const input = checkbox.parentElement.querySelector('input[type="text"]');
-                if(checkbox.checked) {
-                    input.disabled = false;
-                    input.classList.remove('bg-gray-200', 'text-gray-500');
-                    input.classList.add('bg-white');
-                    if(input.value === 'N/A') input.value = '';
-                } else {
-                    input.disabled = true;
-                    input.classList.remove('bg-white');
-                    input.classList.add('bg-gray-200', 'text-gray-500');
-                    input.value = 'N/A';
-                }
+            // --- OBJETIVOS (SCI 202) ---
+            window.updateObjectiveTime = (sel) => {
+                sel.closest('.objective-item').querySelector('.obj-time').innerText = new Date().toTimeString().substring(0,5); 
+                sel.className = "obj-status w-full p-1.5 border rounded text-[10px] md:text-sm outline-none font-bold transition-colors " + 
+                    (sel.value === 'Cumplido' ? 'bg-green-100 text-green-800 border-green-300' : 
+                     sel.value === 'No Cumplido' ? 'bg-red-100 text-red-800 border-red-300' : 
+                     sel.value === 'En Curso' ? 'bg-blue-100 text-blue-800 border-blue-300' : 'bg-gray-50 border-gray-300 text-gray-700');
             };
-
-            // --- LÓGICA DE OBJETIVOS (SCI 202) ---
-            window.updateObjectiveTime = function(selectElement) {
-                const timeSpan = selectElement.closest('.objective-item').querySelector('.obj-time');
-                const now = new Date();
-                timeSpan.innerText = now.toTimeString().substring(0,5); 
-                
-                const val = selectElement.value;
-                selectElement.className = "obj-status w-full p-1.5 border rounded text-sm outline-none font-bold transition-colors " + 
-                    (val === 'Cumplido' ? 'bg-green-100 text-green-800 border-green-300' : 
-                     val === 'No Cumplido' ? 'bg-red-100 text-red-800 border-red-300' : 
-                     val === 'En Curso' ? 'bg-blue-100 text-blue-800 border-blue-300' : 'bg-gray-50 border-gray-300 text-gray-700');
-            };
-
-            window.addObjective = function(data = null) {
-                const container = document.getElementById('objetivos-container');
-                const div = document.createElement('div');
-                div.className = "bg-white p-3 rounded border border-gray-300 shadow-sm objective-item relative";
+            window.addObjective = (data = null) => {
+                const div = document.createElement('div'); div.className = "bg-white p-2 md:p-3 rounded border border-gray-300 shadow-sm objective-item relative";
                 div.innerHTML = `
-                    <button onclick="this.parentElement.remove()" class="absolute top-2 right-2 text-red-500 hover:text-red-700 font-bold no-print text-lg leading-none" title="Eliminar Objetivo">&times;</button>
-                    <div class="grid grid-cols-1 md:grid-cols-12 gap-3 mb-2">
-                        <div class="md:col-span-7">
-                            <label class="text-xs font-bold text-dcc-blue">Descripción del Objetivo</label>
-                            <input type="text" class="obj-desc w-full p-1.5 border border-gray-300 rounded text-sm outline-none focus:border-dcc-orange" placeholder="Ej. Controlar incendio en flanco oriental..." value="${data ? data.desc : ''}">
-                        </div>
-                        <div class="md:col-span-3">
-                            <label class="text-xs font-bold text-gray-600">Estado de Avance</label>
-                            <select class="obj-status w-full p-1.5 border border-gray-300 rounded text-sm outline-none bg-gray-50 text-gray-700 font-bold transition-colors" onchange="updateObjectiveTime(this)">
-                                <option value="Planeado">🗓️ Planeado</option>
-                                <option value="En Curso">⏳ En Curso</option>
-                                <option value="Cumplido">✅ Cumplido</option>
-                                <option value="No Cumplido">❌ No Cumplido / Abandonado</option>
-                            </select>
-                        </div>
-                        <div class="md:col-span-2 flex flex-col justify-center items-center">
-                            <label class="text-[10px] font-bold text-gray-500">Última Modif.</label>
-                            <span class="obj-time text-xs font-mono text-center bg-gray-100 px-2 py-1 rounded border inline-block min-w-[50px]">${data ? data.time : '--:--'}</span>
-                        </div>
+                    <button onclick="this.parentElement.remove()" class="absolute top-1 right-2 text-red-500 hover:text-red-700 font-bold no-print text-lg leading-none">&times;</button>
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-3 mb-2">
+                        <div class="md:col-span-7"><label class="text-[10px] md:text-xs font-bold text-dcc-blue">Descripción del Objetivo</label><input type="text" class="obj-desc w-full p-1 border border-gray-300 rounded text-xs md:text-sm outline-none focus:border-dcc-orange" value="${data ? data.desc : ''}"></div>
+                        <div class="md:col-span-3"><label class="text-[10px] md:text-xs font-bold text-gray-600">Estado</label><select class="obj-status w-full p-1 border border-gray-300 rounded text-xs md:text-sm outline-none bg-gray-50 text-gray-700 font-bold" onchange="updateObjectiveTime(this)"><option value="Planeado">🗓️ Planeado</option><option value="En Curso">⏳ En Curso</option><option value="Cumplido">✅ Cumplido</option><option value="No Cumplido">❌ Cancelado</option></select></div>
+                        <div class="md:col-span-2 flex flex-col justify-center items-center"><label class="text-[9px] md:text-[10px] font-bold text-gray-500">Últ. Modif.</label><span class="obj-time text-[10px] md:text-xs font-mono text-center bg-gray-100 px-2 py-1 rounded border min-w-[50px]">${data ? data.time : '--:--'}</span></div>
                     </div>
-                    <div class="pl-3 border-l-4 border-dcc-orange mt-2 bg-orange-50/50 p-2 rounded-r">
-                        <label class="text-xs font-bold text-gray-800 flex items-center gap-1">↳ Táctica(s) Asignada(s) a este objetivo</label>
-                        <textarea class="obj-tactics w-full p-1.5 border border-orange-200 rounded text-xs outline-none bg-white mt-1 focus:border-dcc-orange" rows="2" placeholder="Describa específicamente la maniobra o táctica para lograr este objetivo...">${data ? data.tactics : ''}</textarea>
-                    </div>
+                    <div class="pl-2 border-l-4 border-dcc-orange mt-1 bg-orange-50/50 p-1.5 rounded-r"><label class="text-[10px] md:text-xs font-bold text-gray-800">↳ Táctica Asignada</label><textarea class="obj-tactics w-full p-1 border border-orange-200 rounded text-[10px] md:text-xs outline-none bg-white mt-1 focus:border-dcc-orange" rows="2">${data ? data.tactics : ''}</textarea></div>
                 `;
-                
-                if (data && data.status) {
-                    const sel = div.querySelector('.obj-status'); sel.value = data.status;
-                    updateObjectiveTime(sel); div.querySelector('.obj-time').innerText = data.time; 
-                }
-                container.appendChild(div);
+                if (data && data.status) { const sel = div.querySelector('.obj-status'); sel.value = data.status; updateObjectiveTime(sel); div.querySelector('.obj-time').innerText = data.time; }
+                document.getElementById('objetivos-container').appendChild(div);
             };
 
-            // --- LÓGICA DE GRUPOS Y MIEMBROS ---
-            window.addGroup = function(data = null) {
-                const container = document.getElementById('grupos-container');
-                const div = document.createElement('div');
-                div.className = "bg-white p-2 rounded border border-gray-200 group-item relative text-xs mb-2 shadow-sm";
-                
-                let membersHTML = '';
-                if (data && Array.isArray(data.members)) {
-                    data.members.forEach(m => {
-                        membersHTML += `<span class="inline-flex items-center gap-1 bg-dcc-blue text-white text-[10px] px-2 py-1 rounded-full mr-1 mb-1 shadow-sm"><span class="member-badge-text">${m}</span><button type="button" onclick="this.parentElement.remove()" class="text-white hover:text-red-300 font-bold leading-none">&times;</button></span>`;
-                    });
-                }
-
+            // --- GRUPOS ---
+            window.addGroup = (data = null) => {
+                const div = document.createElement('div'); div.className = "bg-white p-2 rounded border border-gray-200 group-item relative text-xs mb-2 shadow-sm";
+                let memHTML = ''; if (data && Array.isArray(data.members)) data.members.forEach(m => memHTML += `<span class="inline-flex items-center gap-1 bg-dcc-blue text-white text-[9px] md:text-[10px] px-1.5 py-0.5 md:py-1 rounded-full mr-1 mb-1"><span class="member-badge-text">${m}</span><button type="button" onclick="this.parentElement.remove()" class="hover:text-red-300 font-bold">&times;</button></span>`);
                 div.innerHTML = `
-                    <button onclick="this.parentElement.remove()" class="absolute top-1 right-1 text-red-500 hover:text-red-700 font-bold no-print text-base leading-none">&times;</button>
-                    <div class="flex gap-2 mb-1 pr-6">
-                        <select class="grp-type p-1 border border-gray-300 rounded outline-none bg-gray-50 w-1/3 font-semibold text-dcc-blue">
-                            <option value="Grupo">Grupo</option>
-                            <option value="Fuerza Tarea">Fuerza de Tarea</option>
-                            <option value="Equipo">Eq. Intervención</option>
-                        </select>
-                        <input type="text" class="grp-name w-2/3 p-1 border border-gray-300 rounded outline-none focus:border-dcc-orange" placeholder="Nombre/Indicativo (Ej. Alfa 1)" value="${data ? data.name : ''}">
-                    </div>
-                    <div class="members-area border border-gray-300 rounded p-1.5 mt-1 bg-white focus-within:border-dcc-orange">
-                        <div class="members-list flex flex-wrap mb-1 min-h-[20px]">${membersHTML}</div>
-                        <input type="text" onkeydown="if(event.key === 'Enter'){ event.preventDefault(); const v = this.value.trim(); if(v){ this.previousElementSibling.innerHTML += \`<span class='inline-flex items-center gap-1 bg-dcc-blue text-white text-[10px] px-2 py-1 rounded-full mr-1 mb-1 shadow-sm'><span class='member-badge-text'>\${v}</span><button type='button' onclick='this.parentElement.remove()' class='text-white hover:text-red-300 font-bold leading-none'>&times;</button></span>\`; this.value = ''; } }" class="w-full text-xs p-1 outline-none border-t border-dashed border-gray-200 bg-transparent" placeholder="Escriba el nombre del miembro y presione Enter...">
-                    </div>
+                    <button onclick="this.parentElement.remove()" class="absolute top-1 right-1 text-red-500 font-bold no-print text-base leading-none">&times;</button>
+                    <div class="flex gap-1 mb-1 pr-4"><select class="grp-type p-1 border border-gray-300 rounded outline-none bg-gray-50 w-1/3 font-semibold text-dcc-blue text-[10px] md:text-xs"><option value="Grupo">Grupo</option><option value="Fuerza Tarea">Fuerza Tarea</option><option value="Equipo">Eq. Intervención</option></select><input type="text" class="grp-name w-2/3 p-1 border border-gray-300 rounded outline-none text-[10px] md:text-xs" placeholder="Indicativo (Ej. Alfa 1)" value="${data ? data.name : ''}"></div>
+                    <div class="border border-gray-300 rounded p-1 bg-white"><div class="members-list flex flex-wrap min-h-[15px]">${memHTML}</div><input type="text" onkeydown="if(event.key === 'Enter'){ event.preventDefault(); const v = this.value.trim(); if(v){ this.previousElementSibling.innerHTML += \`<span class='inline-flex items-center gap-1 bg-dcc-blue text-white text-[9px] md:text-[10px] px-1.5 py-0.5 md:py-1 rounded-full mr-1 mb-1'><span class='member-badge-text'>\${v}</span><button type='button' onclick='this.parentElement.remove()' class='hover:text-red-300 font-bold'>&times;</button></span>\`; this.value = ''; } }" class="w-full text-[10px] md:text-xs p-1 outline-none border-t border-dashed border-gray-200 mt-1" placeholder="Nombre + Enter..."></div>
                 `;
                 if (data && data.type) div.querySelector('.grp-type').value = data.type;
-                container.appendChild(div);
+                document.getElementById('grupos-container').appendChild(div);
             };
 
-            addObjective(); addGroup({type: 'Fuerza Tarea', name: '', members: []});
+            addObjective(); addGroup();
 
-            // --- LÓGICA DE MAPAS Y TABLERO ---
-            const tabCanvasBtn = document.getElementById('tab-canvas-btn'); const tabMapBtn = document.getElementById('tab-map-btn');
-            const canvasContainer = document.getElementById('canvas-container'); const leafletContainer = document.getElementById('leaflet-container');
-            let mymap; let volunteerMarkers = {}; const liveUsersList = document.getElementById('live-users-list');
-
-            const svgIconHtml = `<svg viewBox="0 0 24 24" width="36" height="36" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.5));"><path d="M4 11C4 6.58 7.58 3 12 3C16.42 3 20 6.58 20 11" fill="#FF6B00"/><path d="M2 11H22" stroke="#FF6B00" stroke-width="2.5" stroke-linecap="round"/><rect x="9" y="12" width="6" height="3" fill="#FFCC99" rx="1"/><path d="M5 16C5 16 5 24 5 24H19C19 24 19 16 19 16C19 15 15 14 12 14C9 14 5 15 5 16Z" fill="#FF6B00"/><rect x="5" y="18" width="14" height="2.5" fill="#002855"/></svg>`;
-
+            // --- LEAFLET MAP ---
+            let mymap; let volunteerMarkers = {};
             function initLeafletMap() {
-                if(mymap) return;
-                mymap = L.map('mapid').setView([4.6097, -74.0817], 6);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mymap);
-                if ("geolocation" in navigator) { navigator.geolocation.getCurrentPosition(pos => mymap.setView([pos.coords.latitude, pos.coords.longitude], 14)); }
+                if(mymap) return; mymap = L.map('mapid').setView([4.6097, -74.0817], 6); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mymap);
+                if ("geolocation" in navigator) navigator.geolocation.getCurrentPosition(pos => mymap.setView([pos.coords.latitude, pos.coords.longitude], 14));
             }
-
             function initCommandCenterGPS() {
-                const locCollection = collection(db, 'artifacts', appId, 'public', 'data', 'locations');
-                onSnapshot(locCollection, (snapshot) => {
-                    liveUsersList.innerHTML = '';
+                onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'locations'), (snapshot) => {
+                    document.getElementById('live-users-list').innerHTML = '';
                     snapshot.forEach((doc) => {
-                        const data = doc.data();
-                        if (Date.now() - data.timestamp > 3600000) return; 
-                        const li = document.createElement('li'); li.className = "text-green-600 font-semibold"; li.innerText = `${data.name} (Transmitiendo)`;
-                        liveUsersList.appendChild(li);
+                        const data = doc.data(); if (Date.now() - data.timestamp > 3600000) return; 
+                        document.getElementById('live-users-list').innerHTML += `<li class="text-green-600 font-semibold">${data.name}</li>`;
                         if(mymap) {
                             const latlng = [data.lat, data.lng];
                             if(volunteerMarkers[doc.id]) { volunteerMarkers[doc.id].setLatLng(latlng); } 
-                            else {
-                                const vIcon = L.divIcon({ className: 'bg-transparent', html: `<div class="flex flex-col items-center">${svgIconHtml}<span class="bg-white text-xs px-1 rounded border shadow font-bold text-black mt-1 whitespace-nowrap">${data.name}</span></div>`, iconSize: [40, 50], iconAnchor: [20, 25] });
-                                volunteerMarkers[doc.id] = L.marker(latlng, {icon: vIcon}).addTo(mymap);
-                            }
+                            else { volunteerMarkers[doc.id] = L.marker(latlng, {icon: L.divIcon({ className: 'bg-transparent', html: `<div class="flex flex-col items-center"><svg viewBox="0 0 24 24" width="30" height="30" style="filter:drop-shadow(0 2px 2px rgba(0,0,0,0.5))"><path d="M4 11C4 6.58 7.58 3 12 3C16.42 3 20 6.58 20 11" fill="#FF6B00"/><path d="M2 11H22" stroke="#FF6B00" stroke-width="2.5"/><rect x="9" y="12" width="6" height="3" fill="#FFCC99" rx="1"/><path d="M5 16v8h14v-8c0-1-4-2-7-2s-7 1-7 2z" fill="#FF6B00"/><rect x="5" y="18" width="14" height="2.5" fill="#002855"/></svg><span class="bg-white text-[8px] px-1 rounded shadow font-bold text-black mt-0.5">${data.name}</span></div>`, iconSize: [30, 40], iconAnchor: [15, 20] })}).addTo(mymap); }
                         }
                     });
-                    if(liveUsersList.innerHTML === '') liveUsersList.innerHTML = '<li class="text-gray-400 italic">No hay unidades transmitiendo</li>';
-                }, (error) => console.error("Error leyendo ubicaciones", error));
+                    if(document.getElementById('live-users-list').innerHTML === '') document.getElementById('live-users-list').innerHTML = '<li class="text-gray-400 italic">Sin conexión</li>';
+                });
             }
 
-            tabCanvasBtn.addEventListener('click', () => {
-                tabCanvasBtn.classList.replace('text-gray-600', 'text-dcc-blue'); tabCanvasBtn.classList.replace('bg-transparent', 'bg-white'); tabCanvasBtn.classList.replace('border-transparent', 'border-dcc-orange');
-                tabMapBtn.classList.replace('text-dcc-blue', 'text-gray-600'); tabMapBtn.classList.replace('bg-white', 'bg-transparent'); tabMapBtn.classList.replace('border-dcc-orange', 'border-transparent');
-                canvasContainer.classList.remove('hidden'); leafletContainer.classList.add('hidden');
-            });
-            tabMapBtn.addEventListener('click', () => {
-                tabMapBtn.classList.replace('text-gray-600', 'text-dcc-blue'); tabMapBtn.classList.replace('bg-transparent', 'bg-white'); tabMapBtn.classList.replace('border-transparent', 'border-dcc-orange');
-                tabCanvasBtn.classList.replace('text-dcc-blue', 'text-gray-600'); tabCanvasBtn.classList.replace('bg-white', 'bg-transparent'); tabCanvasBtn.classList.replace('border-dcc-orange', 'border-transparent');
-                canvasContainer.classList.add('hidden'); leafletContainer.classList.remove('hidden');
-                initLeafletMap(); mymap.invalidateSize();
-            });
+            document.getElementById('tab-canvas-btn').addEventListener('click', function() { this.classList.replace('text-gray-600','text-dcc-blue'); this.classList.replace('bg-transparent','bg-white'); this.classList.replace('border-transparent','border-dcc-orange'); document.getElementById('tab-map-btn').classList.replace('text-dcc-blue','text-gray-600'); document.getElementById('tab-map-btn').classList.replace('bg-white','bg-transparent'); document.getElementById('tab-map-btn').classList.replace('border-dcc-orange','border-transparent'); document.getElementById('canvas-container').classList.remove('hidden'); document.getElementById('leaflet-container').classList.add('hidden'); });
+            document.getElementById('tab-map-btn').addEventListener('click', function() { this.classList.replace('text-gray-600','text-dcc-blue'); this.classList.replace('bg-transparent','bg-white'); this.classList.replace('border-transparent','border-dcc-orange'); document.getElementById('tab-canvas-btn').classList.replace('text-dcc-blue','text-gray-600'); document.getElementById('tab-canvas-btn').classList.replace('bg-white','bg-transparent'); document.getElementById('tab-canvas-btn').classList.replace('border-dcc-orange','border-transparent'); document.getElementById('canvas-container').classList.add('hidden'); document.getElementById('leaflet-container').classList.remove('hidden'); initLeafletMap(); mymap.invalidateSize(); });
 
-            // Lógica Canvas y Dibujo
+            // --- CANVAS DRAWING & CLICK-TO-PLACE & PASTE ---
             const mapCanvas = document.getElementById('map-canvas'); const gridCanvas = document.getElementById('grid-canvas'); const objectsCanvas = document.getElementById('objects-canvas'); const drawingCanvas = document.getElementById('drawing-canvas');
             const mapCtx = mapCanvas.getContext('2d'); const gridCtx = gridCanvas.getContext('2d'); const objectsCtx = objectsCanvas.getContext('2d'); const drawingCtx = drawingCanvas.getContext('2d');
-            let isDrawing = false; let isDragging = false; let draggedItem = null; let selectedObject = null;
-            let dragOffsetX, dragOffsetY; let placedObjects = []; let volunteerCounter = 1; let pendingDrop = null;
+            let isDrawing = false, isDragging = false, draggedItem = null, selectedObject = null, placedObjects = [], clickToPlaceMode = false, pendingDrop = null, volCount = 1;
             const toolState = { currentTool: 'pen', color: '#FF6B00', size: 3 };
 
             function resizeCanvases() {
-                const rect = canvasContainer.getBoundingClientRect(); if(rect.width === 0) return; 
+                const rect = document.getElementById('canvas-container').getBoundingClientRect(); if(rect.width===0) return; 
                 [mapCanvas, gridCanvas, objectsCanvas, drawingCanvas].forEach(c => { c.width = rect.width; c.height = rect.height; });
-                drawGrid(); drawObjects();
-            }
-
-            function drawGrid() {
-                gridCtx.clearRect(0, 0, gridCanvas.width, gridCanvas.height); gridCtx.beginPath(); gridCtx.strokeStyle = 'rgba(200, 200, 200, 0.3)'; gridCtx.lineWidth = 1;
-                for (let x = 0; x <= gridCanvas.width; x += 30) { gridCtx.moveTo(x, 0); gridCtx.lineTo(x, gridCanvas.height); }
-                for (let y = 0; y <= gridCanvas.height; y += 30) { gridCtx.moveTo(0, y); gridCtx.lineTo(gridCanvas.width, y); }
-                gridCtx.stroke();
+                gridCtx.strokeStyle = 'rgba(200, 200, 200, 0.3)'; for (let x=0; x<=gridCanvas.width; x+=30) { gridCtx.moveTo(x,0); gridCtx.lineTo(x,gridCanvas.height); } for (let y=0; y<=gridCanvas.height; y+=30) { gridCtx.moveTo(0,y); gridCtx.lineTo(gridCanvas.width,y); } gridCtx.stroke();
+                drawObjects();
             }
 
             function drawObjects() {
                 objectsCtx.clearRect(0, 0, objectsCanvas.width, objectsCanvas.height);
                 placedObjects.forEach(obj => {
                     if(obj.type === 'Voluntario') {
-                        objectsCtx.font = '24px Arial'; objectsCtx.textAlign = 'center'; objectsCtx.textBaseline = 'middle';
-                        objectsCtx.fillText('👷', obj.x, obj.y - 5);
-                        objectsCtx.font = 'bold 11px Arial';
-                        const w = objectsCtx.measureText(obj.label).width;
-                        objectsCtx.fillStyle = 'rgba(255,255,255,0.8)'; objectsCtx.fillRect(obj.x - w/2 - 2, obj.y + 10, w + 4, 14);
-                        objectsCtx.fillStyle = '#FF6B00'; objectsCtx.fillText(obj.label, obj.x, obj.y + 17);
+                        objectsCtx.font = '20px Arial'; objectsCtx.textAlign = 'center'; objectsCtx.textBaseline = 'middle'; objectsCtx.fillText('👷', obj.x, obj.y - 5);
+                        objectsCtx.font = 'bold 9px Arial'; const w = objectsCtx.measureText(obj.label).width; objectsCtx.fillStyle = 'rgba(255,255,255,0.8)'; objectsCtx.fillRect(obj.x - w/2 - 2, obj.y + 8, w + 4, 12); objectsCtx.fillStyle = '#FF6B00'; objectsCtx.fillText(obj.label, obj.x, obj.y + 14);
                     } else {
-                        objectsCtx.fillStyle = 'rgba(255, 255, 255, 0.9)'; objectsCtx.beginPath(); objectsCtx.arc(obj.x, obj.y, 18, 0, Math.PI * 2); objectsCtx.fill();
+                        objectsCtx.fillStyle = 'rgba(255, 255, 255, 0.9)'; objectsCtx.beginPath(); objectsCtx.arc(obj.x, obj.y, 14, 0, Math.PI * 2); objectsCtx.fill();
                         objectsCtx.strokeStyle = '#002855'; objectsCtx.lineWidth = 2; objectsCtx.stroke();
-                        objectsCtx.fillStyle = '#002855'; objectsCtx.font = 'bold 12px Arial'; objectsCtx.textAlign = 'center'; objectsCtx.textBaseline = 'middle';
-                        objectsCtx.fillText(obj.label, obj.x, obj.y);
+                        objectsCtx.fillStyle = '#002855'; objectsCtx.font = 'bold 10px Arial'; objectsCtx.textAlign = 'center'; objectsCtx.textBaseline = 'middle'; objectsCtx.fillText(obj.label, obj.x, obj.y);
                     }
                 });
             }
 
-            document.getElementById('resource-library').addEventListener('dragstart', (e) => {
-                const item = e.target.closest('.resource-item'); if (item) draggedItem = { type: item.dataset.type, label: item.dataset.label };
-            });
-            canvasContainer.addEventListener('dragover', e => e.preventDefault());
-            
-            canvasContainer.addEventListener('drop', (e) => {
-                e.preventDefault();
-                if (draggedItem) {
-                    const rect = drawingCanvas.getBoundingClientRect(); const x = e.clientX - rect.left; const y = e.clientY - rect.top;
-                    
-                    if(draggedItem.type === 'Voluntario') {
-                        pendingDrop = { id: Date.now(), ...draggedItem, x, y };
-                        const vols = window.getAvailableVolunteers();
-                        const select = document.getElementById('vol-modal-select');
-                        
-                        select.innerHTML = '<option value="">-- Seleccione del registro operativo --</option>';
-                        vols.forEach(v => { select.innerHTML += `<option value="${v}">${v}</option>`; });
-                        select.innerHTML += '<option value="custom">✍️ Otro (Ingresar manualmente)</option>';
-                        
-                        document.getElementById('vol-modal-custom-input').value = '';
-                        document.getElementById('vol-modal-custom-input').classList.add('hidden');
-                        document.getElementById('volunteer-modal').classList.remove('hidden');
-                    } else {
-                        placedObjects.push({ id: Date.now(), ...draggedItem, x, y }); drawObjects();
-                    }
-                    draggedItem = null;
-                }
+            document.querySelectorAll('.resource-item').forEach(item => {
+                item.addEventListener('dragstart', () => { draggedItem = { type: item.dataset.type, label: item.dataset.label }; });
+                item.addEventListener('click', () => {
+                    document.querySelectorAll('.resource-item').forEach(i => i.classList.remove('ring-2', 'ring-dcc-orange', 'bg-orange-100'));
+                    item.classList.add('ring-2', 'ring-dcc-orange', 'bg-orange-100');
+                    draggedItem = { type: item.dataset.type, label: item.dataset.label }; clickToPlaceMode = true;
+                });
             });
 
-            document.getElementById('vol-modal-select').addEventListener('change', (e) => {
-                const customInput = document.getElementById('vol-modal-custom-input');
-                if(e.target.value === 'custom') { customInput.classList.remove('hidden'); customInput.focus(); } 
-                else { customInput.classList.add('hidden'); }
-            });
+            const handlePlacement = (x, y) => {
+                if(draggedItem.type === 'Voluntario') {
+                    pendingDrop = { id: Date.now(), ...draggedItem, x, y };
+                    const sel = document.getElementById('vol-modal-select'); sel.innerHTML = '<option value="">-- Seleccione del registro --</option>';
+                    window.getAvailableVolunteers().forEach(v => sel.innerHTML += `<option value="${v}">${v}</option>`);
+                    sel.innerHTML += '<option value="custom">✍️ Otro...</option>';
+                    document.getElementById('vol-modal-custom-input').classList.add('hidden');
+                    document.getElementById('volunteer-modal').classList.remove('hidden');
+                } else { placedObjects.push({ id: Date.now(), ...draggedItem, x, y }); drawObjects(); }
+                draggedItem = null; clickToPlaceMode = false;
+                document.querySelectorAll('.resource-item').forEach(i => i.classList.remove('ring-2', 'ring-dcc-orange', 'bg-orange-100'));
+            };
 
-            document.getElementById('btn-cancel-vol').addEventListener('click', () => {
-                document.getElementById('volunteer-modal').classList.add('hidden'); pendingDrop = null;
-            });
-
-            document.getElementById('btn-confirm-vol').addEventListener('click', () => {
-                const selectVal = document.getElementById('vol-modal-select').value;
-                let finalName = selectVal;
-                
-                if(selectVal === 'custom') {
-                    finalName = document.getElementById('vol-modal-custom-input').value.trim() || `Voluntario ${volunteerCounter++}`;
-                } else if (selectVal === '') {
-                    finalName = `Voluntario ${volunteerCounter++}`;
-                }
-                
-                if (pendingDrop) {
-                    pendingDrop.label = finalName; placedObjects.push(pendingDrop); drawObjects(); pendingDrop = null;
-                }
-                document.getElementById('volunteer-modal').classList.add('hidden');
-            });
-
+            document.getElementById('canvas-container').addEventListener('dragover', e => e.preventDefault());
+            document.getElementById('canvas-container').addEventListener('drop', e => { e.preventDefault(); if (draggedItem) { const r = drawingCanvas.getBoundingClientRect(); handlePlacement(e.clientX - r.left, e.clientY - r.top); } });
 
             const getCoords = (e) => { const r = drawingCanvas.getBoundingClientRect(); const t = e.touches ? e.touches[0] : null; return { x: (t ? t.clientX : e.clientX) - r.left, y: (t ? t.clientY : e.clientY) - r.top }; };
+            
             const startInter = (e) => {
-                const {x, y} = getCoords(e); selectedObject = placedObjects.slice().reverse().find(o => Math.hypot(x - o.x, y - o.y) < 20);
+                const {x, y} = getCoords(e);
+                if(clickToPlaceMode && draggedItem && document.getElementById('tab-canvas-btn').classList.contains('bg-white')) { handlePlacement(x, y); return; }
+                selectedObject = placedObjects.slice().reverse().find(o => Math.hypot(x - o.x, y - o.y) < 20);
                 if (selectedObject) { isDragging = true; dragOffsetX = x - selectedObject.x; dragOffsetY = y - selectedObject.y; }
-                else { 
-                    isDrawing = true; drawingCtx.beginPath(); drawingCtx.moveTo(x, y); 
-                    drawingCtx.lineCap = 'round'; drawingCtx.lineJoin = 'round'; drawingCtx.lineWidth = toolState.size * (toolState.currentTool === 'eraser' ? 5 : 1);
-                    drawingCtx.globalCompositeOperation = toolState.currentTool === 'eraser' ? 'destination-out' : 'source-over'; drawingCtx.strokeStyle = toolState.color;
-                }
+                else { isDrawing = true; drawingCtx.beginPath(); drawingCtx.moveTo(x, y); drawingCtx.lineCap = 'round'; drawingCtx.lineJoin = 'round'; drawingCtx.lineWidth = toolState.size * (toolState.currentTool === 'eraser' ? 5 : 1); drawingCtx.globalCompositeOperation = toolState.currentTool === 'eraser' ? 'destination-out' : 'source-over'; drawingCtx.strokeStyle = toolState.color; }
             };
             const moveInter = (e) => {
                 if (isDragging && selectedObject) { const {x,y} = getCoords(e); selectedObject.x = x - dragOffsetX; selectedObject.y = y - dragOffsetY; drawObjects(); }
@@ -743,138 +664,240 @@
             drawingCanvas.addEventListener('mousedown', startInter); drawingCanvas.addEventListener('mousemove', moveInter); drawingCanvas.addEventListener('mouseup', endInter); drawingCanvas.addEventListener('mouseout', endInter);
             drawingCanvas.addEventListener('touchstart', (e) => {e.preventDefault(); startInter(e);}, {passive:false}); drawingCanvas.addEventListener('touchmove', (e) => {e.preventDefault(); moveInter(e);}, {passive:false}); drawingCanvas.addEventListener('touchend', endInter);
 
-            window.addEventListener('resize', resizeCanvases); setTimeout(resizeCanvases, 200);
+            window.addEventListener('resize', resizeCanvases); setTimeout(resizeCanvases, 300);
 
+            // Modal Logic
+            document.getElementById('vol-modal-select').addEventListener('change', e => { const c = document.getElementById('vol-modal-custom-input'); if(e.target.value === 'custom') c.classList.remove('hidden'); else c.classList.add('hidden'); });
+            document.getElementById('btn-cancel-vol').addEventListener('click', () => document.getElementById('volunteer-modal').classList.add('hidden'));
+            document.getElementById('btn-confirm-vol').addEventListener('click', () => {
+                const s = document.getElementById('vol-modal-select').value;
+                pendingDrop.label = s === 'custom' ? (document.getElementById('vol-modal-custom-input').value.trim() || `Voluntario ${volCount++}`) : (s === '' ? `Voluntario ${volCount++}` : s);
+                placedObjects.push(pendingDrop); drawObjects(); document.getElementById('volunteer-modal').classList.add('hidden');
+            });
+
+            // Herramientas Pizarra
             document.getElementById('pen-tool').addEventListener('click', function() { toolState.currentTool = 'pen'; this.classList.add('bg-dcc-blue', 'text-white'); document.getElementById('eraser-tool').classList.remove('bg-dcc-blue', 'text-white'); });
             document.getElementById('eraser-tool').addEventListener('click', function() { toolState.currentTool = 'eraser'; this.classList.add('bg-dcc-blue', 'text-white'); document.getElementById('pen-tool').classList.remove('bg-dcc-blue', 'text-white'); });
             document.getElementById('color-picker').addEventListener('input', e => toolState.color = e.target.value);
             document.getElementById('brush-size').addEventListener('input', e => toolState.size = e.target.value);
             document.getElementById('clear-drawings').addEventListener('click', () => drawingCtx.clearRect(0,0, drawingCanvas.width, drawingCanvas.height));
             document.getElementById('clear-board').addEventListener('click', () => { if(confirm('Limpiar plano?')){ mapCtx.clearRect(0,0, mapCanvas.width, mapCanvas.height); drawingCtx.clearRect(0,0, drawingCanvas.width, drawingCanvas.height); placedObjects=[]; drawObjects(); }});
+            
+            // Función para renderizar imagen en el canvas
+            const loadMapImage = (file) => {
+                if(file && file.type.startsWith('image/')) { 
+                    const r = new FileReader(); 
+                    r.onload = ev => { 
+                        const i = new Image(); 
+                        i.onload = () => { 
+                            mapCtx.clearRect(0,0,mapCanvas.width,mapCanvas.height); 
+                            const r = Math.min(mapCanvas.width/i.width, mapCanvas.height/i.height); 
+                            mapCtx.drawImage(i, 0,0, i.width, i.height, (mapCanvas.width - i.width*r)/2, (mapCanvas.height - i.height*r)/2, i.width*r, i.height*r); 
+                        }; 
+                        i.src = ev.target.result; 
+                    }; 
+                    r.readAsDataURL(file); 
+                }
+            };
+            
+            // Botones de cargar mapa (Múltiples)
+            const mapInput = document.getElementById('map-upload-input');
+            mapInput.addEventListener('change', (e) => loadMapImage(e.target.files[0]));
+            document.getElementById('map-upload-btn').addEventListener('click', () => mapInput.click());
+            document.getElementById('quick-map-upload-btn').addEventListener('click', () => mapInput.click());
 
-            // NFC
-            document.getElementById('btn-generate-nfc').addEventListener('click', () => { document.getElementById('nfc-modal').classList.remove('hidden'); document.getElementById('nfc-url-output').value = "Ingrese el nombre para generar..."; });
+            // Pegar Imagen en el Tablero (Paste Event)
+            document.addEventListener('paste', (e) => {
+                if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return; // Ignorar si escribe texto
+                const items = e.clipboardData.items;
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].type.indexOf('image') !== -1) {
+                        loadMapImage(items[i].getAsFile());
+                        // Cambiar automáticamente a la pestaña de pizarra si estaba en el mapa GPS
+                        if(document.getElementById('canvas-container').classList.contains('hidden')){
+                            document.getElementById('tab-canvas-btn').click();
+                        }
+                        break;
+                    }
+                }
+            });
+
+            // NFC Modal
+            document.getElementById('btn-generate-nfc').addEventListener('click', () => { document.getElementById('nfc-modal').classList.remove('hidden'); });
             document.getElementById('nfc-vol-name').addEventListener('input', () => { document.getElementById('nfc-url-output').value = `${window.location.href.split('?')[0]}?tracker=true&name=${encodeURIComponent(document.getElementById('nfc-vol-name').value)}`; });
             document.getElementById('btn-close-nfc').addEventListener('click', () => document.getElementById('nfc-modal').classList.add('hidden'));
             document.getElementById('btn-copy-nfc').addEventListener('click', () => { document.getElementById('nfc-url-output').select(); document.execCommand('copy'); alert("URL copiada."); });
 
             // Tablas SCI
-            window.addPatientRow = function(data = ['', '', 'verde', '']) {
-                const tbody = document.getElementById('sci207-body'); const row = document.createElement('tr'); row.className = "border-b hover:bg-red-50";
-                row.innerHTML = `<td class="px-2 py-1"><input type="text" value="${data[0]}" class="w-full text-xs p-1 border rounded outline-none" placeholder="Nombre/CC"></td><td class="px-2 py-1"><input type="text" value="${data[1]}" class="w-full text-xs p-1 border rounded outline-none" placeholder="Condición..."></td><td class="px-2 py-1"><select class="w-full text-xs p-1 border rounded outline-none"><option value="verde" ${data[2]=='verde'?'selected':''}>🟢 Verde</option><option value="amarillo" ${data[2]=='amarillo'?'selected':''}>🟡 Amarillo</option><option value="rojo" ${data[2]=='rojo'?'selected':''}>🔴 Rojo</option><option value="negro" ${data[2]=='negro'?'selected':''}>⚫ Negro</option></select></td><td class="px-2 py-1"><input type="text" value="${data[3]}" class="w-full text-xs p-1 border rounded outline-none" placeholder="Destino"></td><td class="px-2 py-1 text-center no-print"><button onclick="this.closest('tr').remove()" class="text-red-500 font-bold">&times;</button></td>`;
-                tbody.appendChild(row);
+            window.addPatientRow = (data = ['', '', '', 'verde', '']) => {
+                const tr = document.createElement('tr'); tr.className = "border-b hover:bg-red-50";
+                tr.innerHTML = `<td class="px-1 md:px-2 py-1"><input type="text" value="${data[0]}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none" placeholder="Nombre"></td><td class="px-1 md:px-2 py-1"><input type="number" value="${data[1]}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none" placeholder="Cédula"></td><td class="px-1 md:px-2 py-1"><input type="text" value="${data[2]}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none" placeholder="Trauma..."></td><td class="px-1 md:px-2 py-1"><select class="w-full text-[10px] md:text-xs p-1 border rounded outline-none"><option value="verde" ${data[3]=='verde'?'selected':''}>🟢 Verde</option><option value="amarillo" ${data[3]=='amarillo'?'selected':''}>🟡 Amaril</option><option value="rojo" ${data[3]=='rojo'?'selected':''}>🔴 Rojo</option><option value="negro" ${data[3]=='negro'?'selected':''}>⚫ Negro</option></select></td><td class="px-1 md:px-2 py-1"><input type="text" value="${data[4]}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none" placeholder="Destino"></td><td class="px-1 md:px-2 py-1 text-center no-print"><button onclick="this.closest('tr').remove()" class="text-red-500 font-bold">&times;</button></td>`;
+                document.getElementById('sci207-body').appendChild(tr);
             };
-            window.addLogEntry = function(data = [new Date().toTimeString().substring(0,5), '', '']) {
-                const tbody = document.getElementById('sci211-body'); const row = document.createElement('tr'); row.className = "border-b hover:bg-blue-50";
-                row.innerHTML = `<td class="px-2 py-1"><input type="time" value="${data[0]}" class="w-full text-xs p-1 border rounded outline-none"></td><td class="px-2 py-1"><input type="text" value="${data[1]}" class="w-full text-xs p-1 border rounded outline-none" placeholder="Descripción..."></td><td class="px-2 py-1"><input type="text" value="${data[2]}" class="w-full text-xs p-1 border rounded outline-none" placeholder="Cargo/Persona"></td><td class="px-2 py-1 text-center no-print"><button onclick="this.closest('tr').remove()" class="text-red-500 font-bold">&times;</button></td>`;
-                tbody.appendChild(row);
+            window.addLogEntry = (data = [new Date().toTimeString().substring(0,5), '', '']) => {
+                const tr = document.createElement('tr'); tr.className = "border-b hover:bg-blue-50";
+                tr.innerHTML = `<td class="px-1 md:px-2 py-1"><input type="time" value="${data[0]}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none"></td><td class="px-1 md:px-2 py-1"><input type="text" value="${data[1]}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none" placeholder="Descripción..."></td><td class="px-1 md:px-2 py-1"><input type="text" value="${data[2]}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none" placeholder="Persona"></td><td class="px-1 md:px-2 py-1 text-center no-print"><button onclick="this.closest('tr').remove()" class="text-red-500 font-bold">&times;</button></td>`;
+                document.getElementById('sci211-body').appendChild(tr);
             };
             addPatientRow(); addLogEntry();
 
-            // --- EXPORTAR E IMPORTAR (GUARDAR/CARGAR ARCHIVO JSON) ---
-            document.getElementById('btn-export-json').addEventListener('click', () => {
-                const incidentData = {
-                    forms: {
-                        nombre: document.getElementById('incidente-nombre').value,
-                        resp: document.getElementById('incidente-responsable').value,
-                        inicio: document.getElementById('incidente-inicio').value,
-                        fin: document.getElementById('incidente-fin').value,
-                        staff: {
-                            comandante: document.getElementById('staff-comandante').value,
-                            seguridad: { active: document.getElementById('chk-seguridad').checked, value: document.getElementById('staff-seguridad').value },
-                            informacion: { active: document.getElementById('chk-informacion').checked, value: document.getElementById('staff-informacion').value },
-                            enlace: { active: document.getElementById('chk-enlace').checked, value: document.getElementById('staff-enlace').value }
-                        },
-                        secciones: {
-                            operaciones: { active: document.getElementById('chk-operaciones').checked, value: document.getElementById('sec-operaciones').value },
-                            planificacion: { active: document.getElementById('chk-planificacion').checked, value: document.getElementById('sec-planificacion').value },
-                            logistica: { active: document.getElementById('chk-logistica').checked, value: document.getElementById('sec-logistica').value },
-                            admin: { active: document.getElementById('chk-admin').checked, value: document.getElementById('sec-admin').value }
-                        },
-                        objetivos: Array.from(document.querySelectorAll('.objective-item')).map(item => ({
-                            desc: item.querySelector('.obj-desc').value,
-                            status: item.querySelector('.obj-status').value,
-                            time: item.querySelector('.obj-time').innerText,
-                            tactics: item.querySelector('.obj-tactics').value
-                        })),
-                        grupos: Array.from(document.querySelectorAll('.group-item')).map(item => ({
-                            type: item.querySelector('.grp-type').value,
-                            name: item.querySelector('.grp-name').value,
-                            members: Array.from(item.querySelectorAll('.member-badge-text')).map(b => b.innerText)
-                        }))
-                    },
-                    canvas: { objects: placedObjects, drawingUrl: drawingCanvas.toDataURL(), bgUrl: mapCanvas.toDataURL() },
-                    table207: Array.from(document.querySelectorAll('#sci207-body tr')).map(tr => Array.from(tr.querySelectorAll('input, select')).map(i => i.value)),
-                    table211: Array.from(document.querySelectorAll('#sci211-body tr')).map(tr => Array.from(tr.querySelectorAll('input')).map(i => i.value))
-                };
-                const blob = new Blob([JSON.stringify(incidentData)], {type: 'application/json'});
-                const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Incidente_${incidentData.forms.nombre || 'DCC'}.json`; a.click();
-            });
+            // --- REGISTRO FOTOGRÁFICO Y EVIDENCIAS ---
+            let evidencesList = [];
+            const evidenceInput = document.getElementById('evidence-upload');
+            const evidencesContainer = document.getElementById('evidences-container');
+            const noEvidencesMsg = document.getElementById('no-evidences-msg');
 
-            document.getElementById('btn-import-json').addEventListener('click', () => document.getElementById('import-file-input').click());
-            document.getElementById('import-file-input').addEventListener('change', (e) => {
+            evidenceInput.addEventListener('change', (e) => {
                 const file = e.target.files[0];
                 if(file) {
                     const reader = new FileReader();
                     reader.onload = (ev) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            // Crear un canvas para procesar y estampar la foto
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            
+                            // Optimizar tamaño máximo (evita colapsos de memoria)
+                            const MAX_WIDTH = 1280;
+                            const MAX_HEIGHT = 1280;
+                            let width = img.width;
+                            let height = img.height;
+
+                            if (width > height) {
+                                if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                            } else {
+                                if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+                            }
+
+                            canvas.width = width;
+                            canvas.height = height;
+                            ctx.drawImage(img, 0, 0, width, height);
+
+                            // --- CREAR MARCA DE AGUA (ESTAMPA) ---
+                            // Fondo de la estampa
+                            const barHeight = Math.max(height * 0.15, 70); 
+                            ctx.fillStyle = 'rgba(0, 40, 85, 0.85)'; // Azul DCC
+                            ctx.fillRect(0, height - barHeight, width, barHeight);
+                            
+                            // Línea Naranja superior
+                            ctx.fillStyle = '#FF6B00';
+                            ctx.fillRect(0, height - barHeight, width, Math.max(height * 0.01, 4));
+
+                            // Textos de estampa
+                            ctx.fillStyle = 'white';
+                            ctx.textBaseline = 'top';
+                            const fontSize = Math.max(height * 0.025, 14);
+                            const margin = fontSize;
+                            
+                            const now = new Date();
+                            const timestamp = now.toLocaleString('es-CO');
+                            const author = document.getElementById('incidente-responsable').value || 'Rescatista DCC';
+                            const incidentName = document.getElementById('incidente-nombre').value || 'Incidente en curso';
+                            
+                            ctx.font = `bold ${fontSize}px sans-serif`;
+                            ctx.fillText(`DEFENSA CIVIL COLOMBIANA - SCI`, margin, height - barHeight + margin);
+                            
+                            ctx.font = `normal ${fontSize * 0.8}px sans-serif`;
+                            ctx.fillText(`Incidente: ${incidentName}`, margin, height - barHeight + margin + fontSize * 1.5);
+                            ctx.fillText(`Fecha/Hora: ${timestamp}`, margin, height - barHeight + margin + fontSize * 2.8);
+                            ctx.fillText(`Tomada por: ${author}`, margin, height - barHeight + margin + fontSize * 4.1);
+
+                            // Extraer la nueva imagen estampada
+                            const finalImgBase64 = canvas.toDataURL('image/jpeg', 0.8); // 80% de calidad JPEG
+
+                            addEvidenceData({ id: Date.now(), image: finalImgBase64, time: timestamp, desc: '', category: 'General' });
+                        };
+                        img.src = ev.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            window.addEvidenceData = (evData) => {
+                evidencesList.push(evData);
+                renderEvidences();
+            };
+
+            window.removeEvidence = (id) => {
+                evidencesList = evidencesList.filter(e => e.id !== id);
+                renderEvidences();
+            };
+
+            window.updateEvidence = (id, field, value) => {
+                const ev = evidencesList.find(e => e.id === id);
+                if(ev) ev[field] = value;
+            };
+
+            function renderEvidences() {
+                evidencesContainer.innerHTML = '';
+                if(evidencesList.length === 0) {
+                    noEvidencesMsg.style.display = 'block';
+                } else {
+                    noEvidencesMsg.style.display = 'none';
+                    evidencesList.forEach(ev => {
+                        const div = document.createElement('div');
+                        div.className = "bg-white p-2 border border-gray-300 rounded shadow-sm flex flex-col gap-2 relative no-page-break";
+                        div.innerHTML = `
+                            <button onclick="removeEvidence(${ev.id})" class="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold no-print shadow">&times;</button>
+                            <img src="${ev.image}" class="w-full h-32 object-cover rounded border border-gray-200 mt-2">
+                            <div class="text-[10px] text-dcc-orange font-bold font-mono text-right bg-orange-50 px-1 rounded">${ev.time}</div>
+                            <select onchange="updateEvidence(${ev.id}, 'category', this.value)" class="w-full p-1 text-[10px] md:text-xs font-bold border border-gray-300 rounded outline-none focus:border-dcc-orange bg-gray-50 text-dcc-blue">
+                                <option value="General" ${ev.category==='General'?'selected':''}>📌 General</option>
+                                <option value="Víctima" ${ev.category==='Víctima'?'selected':''}>🤕 Víctima / Paciente</option>
+                                <option value="Incidente/Daños" ${ev.category==='Incidente/Daños'?'selected':''}>🔥 Incidente / Daños</option>
+                                <option value="Lugar/Escena" ${ev.category==='Lugar/Escena'?'selected':''}>📍 Lugar / Escena</option>
+                                <option value="Recursos" ${ev.category==='Recursos'?'selected':''}>🚒 Recursos / Equipos</option>
+                            </select>
+                            <textarea onchange="updateEvidence(${ev.id}, 'desc', this.value)" class="w-full p-1 text-[10px] md:text-xs border border-gray-300 rounded outline-none focus:border-dcc-orange resize-none h-12" placeholder="Escriba detalles u observaciones de esta fotografía...">${ev.desc}</textarea>
+                        `;
+                        evidencesContainer.appendChild(div);
+                    });
+                }
+            }
+
+            // --- EXPORTAR / IMPORTAR (Con Evidencias) ---
+            document.getElementById('btn-export-json').addEventListener('click', () => {
+                const incidentData = {
+                    forms: {
+                        seccional: document.getElementById('incidente-seccional').value, junta: document.getElementById('incidente-junta').value, nombre: document.getElementById('incidente-nombre').value, resp: document.getElementById('incidente-responsable').value, inicio: document.getElementById('incidente-inicio').value, fin: document.getElementById('incidente-fin').value,
+                        staff: { comandante: document.getElementById('staff-comandante').value, seguridad: { active: document.getElementById('chk-seguridad').checked, value: document.getElementById('staff-seguridad').value }, informacion: { active: document.getElementById('chk-informacion').checked, value: document.getElementById('staff-informacion').value }, enlace: { active: document.getElementById('chk-enlace').checked, value: document.getElementById('staff-enlace').value } },
+                        secciones: { operaciones: { active: document.getElementById('chk-operaciones').checked, value: document.getElementById('sec-operaciones').value }, planificacion: { active: document.getElementById('chk-planificacion').checked, value: document.getElementById('sec-planificacion').value }, logistica: { active: document.getElementById('chk-logistica').checked, value: document.getElementById('sec-logistica').value }, admin: { active: document.getElementById('chk-admin').checked, value: document.getElementById('sec-admin').value } },
+                        objetivos: Array.from(document.querySelectorAll('.objective-item')).map(item => ({ desc: item.querySelector('.obj-desc').value, status: item.querySelector('.obj-status').value, time: item.querySelector('.obj-time').innerText, tactics: item.querySelector('.obj-tactics').value })),
+                        grupos: Array.from(document.querySelectorAll('.group-item')).map(item => ({ type: item.querySelector('.grp-type').value, name: item.querySelector('.grp-name').value, members: Array.from(item.querySelectorAll('.member-badge-text')).map(b => b.innerText) }))
+                    },
+                    canvas: { objects: placedObjects, drawingUrl: drawingCanvas.toDataURL(), bgUrl: mapCanvas.toDataURL() },
+                    table207: Array.from(document.querySelectorAll('#sci207-body tr')).map(tr => Array.from(tr.querySelectorAll('input, select')).map(i => i.value)),
+                    table211: Array.from(document.querySelectorAll('#sci211-body tr')).map(tr => Array.from(tr.querySelectorAll('input')).map(i => i.value)),
+                    evidences: evidencesList
+                };
+                const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(incidentData)], {type: 'application/json'})); a.download = `Incidente_${incidentData.forms.nombre || 'DCC'}.json`; a.click();
+            });
+
+            document.getElementById('btn-import-json').addEventListener('click', () => document.getElementById('import-file-input').click());
+            document.getElementById('import-file-input').addEventListener('change', (e) => {
+                if(e.target.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
                         try {
                             const data = JSON.parse(ev.target.result);
-                            document.getElementById('incidente-nombre').value = data.forms.nombre || '';
-                            document.getElementById('incidente-responsable').value = data.forms.resp || '';
-                            document.getElementById('incidente-inicio').value = data.forms.inicio || '';
-                            document.getElementById('incidente-fin').value = data.forms.fin || '';
-                            
-                            if(data.forms.staff) {
-                                document.getElementById('staff-comandante').value = data.forms.staff.comandante || '';
-                                
-                                const setRole = (idChk, idInput, obj) => {
-                                    if(obj) {
-                                        const chk = document.getElementById(idChk);
-                                        const input = document.getElementById(idInput);
-                                        chk.checked = obj.active;
-                                        input.value = obj.value;
-                                        window.toggleRoleInput(chk);
-                                    }
-                                };
-                                setRole('chk-seguridad', 'staff-seguridad', data.forms.staff.seguridad);
-                                setRole('chk-informacion', 'staff-informacion', data.forms.staff.informacion);
-                                setRole('chk-enlace', 'staff-enlace', data.forms.staff.enlace);
-                            }
-
-                            if(data.forms.secciones) {
-                                const setRole = (idChk, idInput, obj) => {
-                                    if(obj) {
-                                        const chk = document.getElementById(idChk);
-                                        const input = document.getElementById(idInput);
-                                        chk.checked = obj.active;
-                                        input.value = obj.value;
-                                        window.toggleRoleInput(chk);
-                                    }
-                                };
-                                setRole('chk-operaciones', 'sec-operaciones', data.forms.secciones.operaciones);
-                                setRole('chk-planificacion', 'sec-planificacion', data.forms.secciones.planificacion);
-                                setRole('chk-logistica', 'sec-logistica', data.forms.secciones.logistica);
-                                setRole('chk-admin', 'sec-admin', data.forms.secciones.admin);
-                            }
-                            
-                            document.getElementById('objetivos-container').innerHTML = '';
-                            if(data.forms.objetivos && data.forms.objetivos.length > 0) {
-                                data.forms.objetivos.forEach(o => addObjective(o));
-                            } else { addObjective(); }
-
-                            document.getElementById('grupos-container').innerHTML = '';
-                            if(data.forms.grupos && data.forms.grupos.length > 0) {
-                                data.forms.grupos.forEach(g => addGroup(g));
-                            } else { addGroup({type: 'Fuerza Tarea', name: '', members: []}); }
-
+                            document.getElementById('incidente-seccional').value = data.forms.seccional || ''; document.getElementById('incidente-junta').value = data.forms.junta || ''; document.getElementById('incidente-nombre').value = data.forms.nombre || ''; document.getElementById('incidente-responsable').value = data.forms.resp || ''; document.getElementById('incidente-inicio').value = data.forms.inicio || ''; document.getElementById('incidente-fin').value = data.forms.fin || '';
+                            if(data.forms.staff) { document.getElementById('staff-comandante').value = data.forms.staff.comandante || ''; const setRole = (idChk, idInput, obj) => { if(obj){ const chk = document.getElementById(idChk); chk.checked = obj.active; document.getElementById(idInput).value = obj.value; window.toggleRoleInput(chk); } }; setRole('chk-seguridad', 'staff-seguridad', data.forms.staff.seguridad); setRole('chk-informacion', 'staff-informacion', data.forms.staff.informacion); setRole('chk-enlace', 'staff-enlace', data.forms.staff.enlace); }
+                            if(data.forms.secciones) { const setRole = (idChk, idInput, obj) => { if(obj){ const chk = document.getElementById(idChk); chk.checked = obj.active; document.getElementById(idInput).value = obj.value; window.toggleRoleInput(chk); } }; setRole('chk-operaciones', 'sec-operaciones', data.forms.secciones.operaciones); setRole('chk-planificacion', 'sec-planificacion', data.forms.secciones.planificacion); setRole('chk-logistica', 'sec-logistica', data.forms.secciones.logistica); setRole('chk-admin', 'sec-admin', data.forms.secciones.admin); }
+                            document.getElementById('objetivos-container').innerHTML = ''; if(data.forms.objetivos && data.forms.objetivos.length > 0) data.forms.objetivos.forEach(o => addObjective(o)); else addObjective();
+                            document.getElementById('grupos-container').innerHTML = ''; if(data.forms.grupos && data.forms.grupos.length > 0) data.forms.grupos.forEach(g => addGroup(g)); else addGroup();
                             document.getElementById('sci207-body').innerHTML = ''; data.table207.forEach(r => addPatientRow(r));
                             document.getElementById('sci211-body').innerHTML = ''; data.table211.forEach(r => addLogEntry(r));
+                            
+                            // Cargar Evidencias
+                            evidencesList = data.evidences || [];
+                            renderEvidences();
+
                             placedObjects = data.canvas.objects || []; drawObjects();
                             const bgImg = new Image(); bgImg.onload = () => mapCtx.drawImage(bgImg, 0,0); bgImg.src = data.canvas.bgUrl;
                             const drawImg = new Image(); drawImg.onload = () => drawingCtx.drawImage(drawImg, 0,0); drawImg.src = data.canvas.drawingUrl;
-                        } catch(err) { alert("Error cargando archivo."); console.error(err); }
-                    };
-                    reader.readAsText(file);
+                        } catch(err) { alert("Error cargando archivo."); }
+                    }; reader.readAsText(e.target.files[0]);
                 }
             });
         });
