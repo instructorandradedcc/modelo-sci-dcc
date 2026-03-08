@@ -1,0 +1,758 @@
+
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tablero Táctico - Defensa Civil Colombiana</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Integración de Leaflet (Alternativa gratuita a Google Maps) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <!-- Configuración de colores institucionales DCC (70% Naranja y 30% Azul) -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        dcc: {
+                            orange: '#FF6B00',
+                            blue: '#002855',
+                            light: '#FFF0E6'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9;
+            color: #1e293b;
+        }
+        .section-card {
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+        .resource-item {
+            cursor: grab;
+            user-select: none;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .resource-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            background-color: #FFF0E6;
+        }
+        .resource-item:active {
+            cursor: grabbing;
+        }
+        #canvas-wrapper {
+            touch-action: none;
+            cursor: crosshair;
+        }
+        .tool-btn.active-tool {
+            background-color: #002855;
+            border-color: #002855;
+            color: white;
+        }
+        
+        /* Custom Scrollbar */
+        .table-container::-webkit-scrollbar { height: 8px; width: 8px; }
+        .table-container::-webkit-scrollbar-track { background: #f1f1f1; }
+        .table-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .table-container::-webkit-scrollbar-thumb:hover { background: #FF6B00; }
+
+        /* Estilos específicos para Impresión / Exportar a PDF */
+        @media print {
+            body { background: white !important; overflow: visible !important; height: auto !important; display: block !important; }
+            aside, header .no-print, .no-print, #upload-prompt { display: none !important; }
+            main { display: block !important; overflow: visible !important; }
+            .section-card { box-shadow: none !important; border: 1px solid #ccc !important; page-break-inside: avoid; margin-bottom: 20px; }
+            #canvas-container { height: 400px !important; border: 1px solid #000; page-break-inside: avoid; }
+            .table-container { max-height: none !important; overflow: visible !important; }
+            /* Expand inputs/textareas to show full text */
+            textarea { height: auto !important; overflow: visible !important; resize: none; border: none !important; background: transparent !important; }
+            input { border: none !important; background: transparent !important; }
+        }
+    </style>
+</head>
+<body class="antialiased h-screen flex flex-col overflow-hidden">
+
+    <!-- Header Institucional (Predominio Naranja) -->
+    <header class="bg-dcc-orange text-white shadow-md z-50 flex-none">
+        <div class="container mx-auto px-4 py-2 flex justify-between items-center">
+            <div class="flex items-center space-x-4">
+                <!-- Logo Oficial DCC -->
+                <div class="bg-white rounded-lg p-1 shadow-sm">
+                    <img src="https://www.defensacivil.gov.co/_templates/DEFCIVIL-PORTAL-2020/recursos/images/cabezote/Logo-Defensoria-Civil.png" alt="Logo DCC" class="h-12 w-auto object-contain">
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-wide drop-shadow-md">DEFENSA CIVIL COLOMBIANA</h1>
+                    <p class="text-sm text-dcc-blue font-bold bg-white/80 inline-block px-2 py-0.5 rounded mt-1">SISTEMA COMANDO DE INCIDENTES</p>
+                </div>
+            </div>
+            <div class="hidden md:flex flex-col items-end text-sm text-right space-y-1 no-print">
+                <button onclick="window.print()" class="bg-dcc-blue hover:bg-blue-900 text-white font-bold py-1.5 px-4 rounded shadow flex items-center gap-2 transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    Imprimir / Exportar PDF
+                </button>
+                <p class="text-white/90 font-semibold text-xs" id="current-datetime"></p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 flex overflow-hidden">
+        
+        <!-- Left Sidebar: Tools & Library (Detalles Azules y Naranjas) -->
+        <aside class="w-72 bg-white border-r border-gray-200 overflow-y-auto flex flex-col flex-none shadow-lg z-40">
+            <div class="p-4 flex-1">
+                <h3 class="text-sm font-bold text-dcc-blue uppercase mb-3 border-b-2 border-dcc-orange pb-1">Biblioteca Operativa</h3>
+                
+                <!-- Recursos Draggable -->
+                <div class="space-y-2 text-sm" id="resource-library">
+                    <!-- Nuevo Recurso: Voluntario Personalizable -->
+                    <div class="resource-item flex items-center bg-dcc-light p-2 rounded border border-orange-200" draggable="true" data-type="Voluntario" data-label="V">
+                        <span class="text-xl mr-3 w-8 text-center text-dcc-orange font-bold">👷</span> 
+                        <span class="font-bold text-dcc-blue">Voluntario / Rescatista</span>
+                        <span class="ml-auto text-[10px] bg-dcc-orange text-white px-1 rounded" title="Preparado para NFC">NFC</span>
+                    </div>
+
+                    <div class="resource-item flex items-center bg-gray-50 p-2 rounded border border-gray-200" draggable="true" data-type="PC" data-label="PC">
+                        <span class="text-xl mr-3 w-8 text-center text-dcc-blue font-bold">★</span> 
+                        <span class="font-semibold text-gray-700">Puesto de Comando</span>
+                    </div>
+                    <div class="resource-item flex items-center bg-gray-50 p-2 rounded border border-gray-200" draggable="true" data-type="Base" data-label="B">
+                        <span class="text-xl mr-3 w-8 text-center text-dcc-blue font-bold">⚑</span> 
+                        <span class="font-semibold text-gray-700">Base</span>
+                    </div>
+                    <div class="resource-item flex items-center bg-gray-50 p-2 rounded border border-gray-200" draggable="true" data-type="Grupo1" data-label="G1">
+                        <span class="text-xl mr-3 w-8 text-center">👥</span> 
+                        <span class="font-semibold text-gray-700">Fuerza de Tarea / Grupo</span>
+                    </div>
+                    <div class="resource-item flex items-center bg-gray-50 p-2 rounded border border-gray-200" draggable="true" data-type="Logistica" data-label="L">
+                        <span class="text-xl mr-3 w-8 text-center">🚚</span> 
+                        <span class="font-semibold text-gray-700">Logística</span>
+                    </div>
+                    <div class="resource-item flex items-center bg-gray-50 p-2 rounded border border-gray-200" draggable="true" data-type="Policia" data-label="PT">
+                        <span class="text-xl mr-3 w-8 text-center">🚓</span> 
+                        <span class="font-semibold text-gray-700">Policía (Tránsito)</span>
+                    </div>
+                    <div class="resource-item flex items-center bg-gray-50 p-2 rounded border border-gray-200" draggable="true" data-type="Dron" data-label="UAV">
+                        <span class="text-xl mr-3 w-8 text-center">🚁</span> 
+                        <span class="font-semibold text-gray-700">Equipo Dron</span>
+                    </div>
+                    <div class="resource-item flex items-center bg-gray-50 p-2 rounded border border-gray-200" draggable="true" data-type="Ambulancia" data-label="A">
+                        <span class="text-xl mr-3 w-8 text-center">🚑</span> 
+                        <span class="font-semibold text-gray-700">Ambulancia</span>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <h3 class="text-sm font-bold text-dcc-blue uppercase mb-3 border-b-2 border-dcc-orange pb-1">Herramientas de Tablero</h3>
+                    
+                    <div class="space-y-4 text-sm">
+                        <div class="flex items-center justify-between">
+                            <label for="color-picker" class="font-semibold text-gray-700">Color de trazo:</label>
+                            <input type="color" id="color-picker" value="#FF6B00" class="w-10 h-8 p-0 border-0 rounded cursor-pointer">
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <label for="brush-size" class="font-semibold text-gray-700">Grosor:</label>
+                            <input type="range" id="brush-size" min="1" max="20" value="3" class="w-32 accent-dcc-orange">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button id="pen-tool" class="tool-btn active-tool p-2 rounded border font-semibold flex items-center justify-center transition">
+                                ✏️ Lápiz
+                            </button>
+                            <button id="eraser-tool" class="tool-btn p-2 rounded border font-semibold flex items-center justify-center bg-gray-50 text-gray-700 transition">
+                                🧼 Borrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Acciones de Tablero -->
+            <div class="p-4 bg-dcc-light border-t space-y-2">
+                <input type="file" id="map-upload-input" class="hidden" accept="image/*">
+                <button id="map-upload-btn" class="w-full bg-dcc-orange text-white font-bold py-2 px-4 rounded hover:bg-orange-600 transition text-sm flex justify-center items-center gap-2 shadow">
+                    📷 Cargar Plano (Fondo)
+                </button>
+                <div class="flex gap-2">
+                    <button id="clear-drawings" class="w-1/2 bg-dcc-blue text-white font-bold py-2 px-2 rounded hover:bg-blue-800 transition text-xs shadow">
+                        Limpiar Trazos
+                    </button>
+                    <button id="clear-board" class="w-1/2 bg-red-600 text-white font-bold py-2 px-2 rounded hover:bg-red-700 transition text-xs shadow">
+                        Limpiar Todo
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Center & Right Content: Board and Forms -->
+        <section class="flex-1 overflow-y-auto p-4 flex flex-col gap-4 bg-gray-100">
+            
+            <!-- Datos del Incidente (Resumen SCI 201) -->
+            <div class="section-card">
+                <h2 class="text-lg font-bold text-dcc-blue mb-4 border-b-2 border-dcc-orange pb-2">Información del Incidente</h2>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+                    <div class="md:col-span-2">
+                        <label class="block font-bold text-gray-700 mb-1">Nombre del Incidente</label>
+                        <input type="text" placeholder="Ej. Incendio Forestal / Inundación..." class="w-full p-2 border border-gray-300 rounded focus:ring-dcc-orange focus:border-dcc-orange outline-none">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block font-bold text-gray-700 mb-1 text-dcc-blue">Elaborado por (Responsable del Registro)</label>
+                        <input type="text" placeholder="Nombre completo o indicativo..." class="w-full p-2 border border-dcc-orange bg-orange-50 rounded focus:ring-dcc-orange focus:border-dcc-orange outline-none font-semibold">
+                    </div>
+
+                    <div class="md:col-span-2 grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block font-bold text-gray-700 mb-1">Periodo Operacional (Inicio)</label>
+                            <input type="datetime-local" class="w-full p-2 border border-gray-300 rounded focus:ring-dcc-orange outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-bold text-gray-700 mb-1">Periodo Operacional (Fin)</label>
+                            <input type="datetime-local" class="w-full p-2 border border-gray-300 rounded focus:ring-dcc-orange outline-none">
+                        </div>
+                    </div>
+                    
+                    <div class="md:col-span-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block font-bold text-gray-700 mb-1">Objetivos del Incidente</label>
+                            <textarea rows="3" class="w-full p-2 border border-gray-300 rounded focus:ring-dcc-orange text-xs outline-none" placeholder="1. Salvaguardar la vida...&#10;2. Controlar..."></textarea>
+                        </div>
+                        <div>
+                            <label class="block font-bold text-gray-700 mb-1">Tácticas del Incidente</label>
+                            <textarea rows="3" class="w-full p-2 border border-gray-300 rounded focus:ring-dcc-orange text-xs outline-none" placeholder="Despliegue de cuadrillas por flanco este..."></textarea>
+                        </div>
+                        <div>
+                            <label class="block font-bold text-gray-700 mb-1">Miembros del Comando (Staff)</label>
+                            <textarea rows="3" class="w-full p-2 border border-gray-300 rounded focus:ring-dcc-orange text-xs outline-none" placeholder="Comandante:&#10;Of. Seguridad:&#10;Of. Enlace:"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tablero Táctico y Mapa (Con Pestañas) -->
+            <div class="section-card flex-1 min-h-[500px] flex flex-col p-0 overflow-hidden border-2 border-gray-300">
+                <!-- Tabs -->
+                <div class="bg-gray-200 flex border-b border-gray-300 no-print">
+                    <button id="tab-canvas-btn" class="px-6 py-3 font-bold text-dcc-blue bg-white border-t-4 border-dcc-orange transition">
+                        ✏️ Plano Local (Pizarra)
+                    </button>
+                    <button id="tab-map-btn" class="px-6 py-3 font-bold text-gray-600 hover:bg-gray-100 border-t-4 border-transparent transition">
+                        🌍 Mapa Georreferenciado (OSM)
+                    </button>
+                </div>
+
+                <!-- CONTENEDOR 1: PIZARRA CANVAS -->
+                <div id="canvas-container" class="relative w-full flex-1 bg-gray-100 overflow-hidden">
+                    <canvas id="map-canvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+                    <canvas id="grid-canvas" class="absolute top-0 left-0 w-full h-full pointer-events-none"></canvas>
+                    <canvas id="objects-canvas" class="absolute top-0 left-0 w-full h-full pointer-events-none"></canvas>
+                    <canvas id="drawing-canvas" class="absolute top-0 left-0 w-full h-full" style="touch-action: none;"></canvas>
+                    
+                    <div id="upload-prompt" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-100/80 text-gray-500 pointer-events-none">
+                        <p class="font-semibold text-lg text-dcc-blue mb-2">Área Operacional (Croquis/Plano)</p>
+                        <p class="text-sm">Arrastre los recursos desde la izquierda hacia aquí.</p>
+                        <p class="text-xs text-gray-400 mt-2">Puede cargar un plano de fondo usando el botón lateral.</p>
+                    </div>
+                </div>
+
+                <!-- CONTENEDOR 2: MAPA LEAFLET -->
+                <div id="leaflet-container" class="relative w-full flex-1 hidden">
+                    <div id="mapid" class="absolute top-0 left-0 w-full h-full z-10"></div>
+                    <div class="absolute top-2 right-2 z-[400] bg-white p-2 rounded shadow text-xs font-bold border border-gray-300 pointer-events-none no-print">
+                        Simulador NFC Activado: Clic en el mapa para ubicar recursos.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Registros Operativos (SCI 207 y SCI 211) -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                
+                <!-- SCI 207: Registro de Pacientes -->
+                <div class="section-card">
+                    <div class="flex justify-between items-center mb-4 border-b-2 border-red-500 pb-2">
+                        <h2 class="text-lg font-bold text-red-700">SCI 207 - Registro de Pacientes</h2>
+                        <button onclick="addPatientRow()" class="bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 px-3 py-1 rounded text-xs font-bold no-print">+ Agregar Herido</button>
+                    </div>
+                    <div class="table-container overflow-x-auto max-h-60">
+                        <table class="w-full text-sm text-left text-gray-600">
+                            <thead class="text-xs text-gray-700 uppercase bg-gray-50 sticky top-0">
+                                <tr>
+                                    <th class="px-2 py-2">ID/Nombre</th>
+                                    <th class="px-2 py-2">Condición</th>
+                                    <th class="px-2 py-2 w-24">Triage</th>
+                                    <th class="px-2 py-2">Traslado</th>
+                                    <th class="px-2 py-2 w-10 no-print"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="sci207-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- SCI 211: Bitácora -->
+                <div class="section-card">
+                    <div class="flex justify-between items-center mb-4 border-b-2 border-dcc-blue pb-2">
+                        <h2 class="text-lg font-bold text-dcc-blue">SCI 211 - Bitácora de Actividades</h2>
+                        <button onclick="addLogEntry()" class="bg-blue-50 text-dcc-blue border border-blue-200 hover:bg-blue-100 px-3 py-1 rounded text-xs font-bold no-print">+ Registrar Evento</button>
+                    </div>
+                    <div class="table-container overflow-x-auto max-h-60">
+                        <table class="w-full text-sm text-left text-gray-600">
+                            <thead class="text-xs text-gray-700 uppercase bg-gray-50 sticky top-0">
+                                <tr>
+                                    <th class="px-2 py-2 w-24">Hora</th>
+                                    <th class="px-2 py-2">Actividad / Evento</th>
+                                    <th class="px-2 py-2">Responsable</th>
+                                    <th class="px-2 py-2 w-10 no-print"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="sci211-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+            
+            <footer class="text-center text-xs text-gray-400 py-4 no-print border-t mt-4">
+                &copy; Propuesta Doctoral - MAHRO | Olmer Geovanny Andrade Cardenas | Herramienta Operativa DCC
+            </footer>
+        </section>
+    </main>
+
+    <script>
+        // --- OFFLINE SUPPORT: Inyección de Service Worker ---
+        // Esto permite que al cargarse una vez, funcione sin internet (cacheo de recursos básicos).
+        if ('serviceWorker' in navigator) {
+            const swCode = `
+                const CACHE_NAME = 'dcc-tactico-v1';
+                self.addEventListener('install', event => {
+                    event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll([
+                        '/',
+                        'https://cdn.tailwindcss.com',
+                        'https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap',
+                        'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
+                        'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+                    ])));
+                });
+                self.addEventListener('fetch', event => {
+                    event.respondWith(caches.match(event.request).then(response => {
+                        return response || fetch(event.request).catch(() => console.log('Estás offline y el recurso no está en caché.'));
+                    }));
+                });
+            `;
+            const blob = new Blob([swCode], { type: 'application/javascript' });
+            navigator.serviceWorker.register(URL.createObjectURL(blob))
+                .then(() => console.log("Service Worker Registrado: Soporte Offline Activado."))
+                .catch(err => console.error("Error registrando SW:", err));
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            
+            // --- Fecha y Hora ---
+            function updateTime() {
+                const now = new Date();
+                document.getElementById('current-datetime').innerText = now.toLocaleString('es-CO');
+            }
+            setInterval(updateTime, 1000);
+            updateTime();
+
+            // --- TAB LOGIC (Canvas vs Leaflet Map) ---
+            const tabCanvasBtn = document.getElementById('tab-canvas-btn');
+            const tabMapBtn = document.getElementById('tab-map-btn');
+            const canvasContainer = document.getElementById('canvas-container');
+            const leafletContainer = document.getElementById('leaflet-container');
+            let leafletMapInitialized = false;
+            let mymap;
+
+            tabCanvasBtn.addEventListener('click', () => {
+                tabCanvasBtn.classList.replace('text-gray-600', 'text-dcc-blue');
+                tabCanvasBtn.classList.replace('bg-transparent', 'bg-white');
+                tabCanvasBtn.classList.replace('border-transparent', 'border-dcc-orange');
+                
+                tabMapBtn.classList.replace('text-dcc-blue', 'text-gray-600');
+                tabMapBtn.classList.replace('bg-white', 'bg-transparent');
+                tabMapBtn.classList.replace('border-dcc-orange', 'border-transparent');
+                
+                canvasContainer.classList.remove('hidden');
+                leafletContainer.classList.add('hidden');
+            });
+
+            tabMapBtn.addEventListener('click', () => {
+                tabMapBtn.classList.replace('text-gray-600', 'text-dcc-blue');
+                tabMapBtn.classList.replace('bg-transparent', 'bg-white');
+                tabMapBtn.classList.replace('border-transparent', 'border-dcc-orange');
+                
+                tabCanvasBtn.classList.replace('text-dcc-blue', 'text-gray-600');
+                tabCanvasBtn.classList.replace('bg-white', 'bg-transparent');
+                tabCanvasBtn.classList.replace('border-dcc-orange', 'border-transparent');
+                
+                canvasContainer.classList.add('hidden');
+                leafletContainer.classList.remove('hidden');
+
+                if (!leafletMapInitialized) {
+                    initLeafletMap();
+                    leafletMapInitialized = true;
+                } else {
+                    mymap.invalidateSize();
+                }
+            });
+
+            // --- Lógica del Mapa Leaflet (Geolocalización Libre y Preparación NFC) ---
+            function initLeafletMap() {
+                // Centrado inicial aproximado (Bogotá/Colombia por defecto)
+                mymap = L.map('mapid').setView([4.6097, -74.0817], 6);
+                
+                // Capa satelital/calle de OpenStreetMap
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(mymap);
+
+                // Simulador NFC: Al hacer clic en el mapa real, agregar el último recurso arrastrado o un marcador base
+                mymap.on('click', function(e) {
+                    const label = prompt("Ingrese identificador para este punto/voluntario (Simulación NFC):", "Voluntario 1");
+                    if(label) {
+                        const markerHtml = `
+                            <div class="bg-dcc-orange text-white rounded-full w-8 h-8 flex items-center justify-center font-bold border-2 border-white shadow-lg text-xs">
+                                👷
+                            </div>
+                            <div class="bg-white px-1 text-xs border border-gray-400 font-bold mt-1 text-center whitespace-nowrap shadow-sm text-black">
+                                ${label}
+                            </div>
+                        `;
+                        const customIcon = L.divIcon({ className: 'custom-div-icon', html: markerHtml, iconSize: [32, 32], iconAnchor: [16, 16] });
+                        L.marker(e.latlng, {icon: customIcon}).addTo(mymap).bindPopup(`<b>${label}</b><br>Geolocalizado vía simulador.`);
+                    }
+                });
+
+                // Intentar obtener la ubicación real del usuario
+                if ("geolocation" in navigator) {
+                    navigator.geolocation.getCurrentPosition(position => {
+                        mymap.setView([position.coords.latitude, position.coords.longitude], 14);
+                    });
+                }
+            }
+
+
+            // --- Lógica del Tablero Táctico (Canvas Pizarra) ---
+            const resourceLibrary = document.getElementById('resource-library');
+            const mapCanvas = document.getElementById('map-canvas');
+            const gridCanvas = document.getElementById('grid-canvas');
+            const objectsCanvas = document.getElementById('objects-canvas');
+            const drawingCanvas = document.getElementById('drawing-canvas');
+            
+            const colorPicker = document.getElementById('color-picker');
+            const brushSize = document.getElementById('brush-size');
+            const penTool = document.getElementById('pen-tool');
+            const eraserTool = document.getElementById('eraser-tool');
+            
+            const mapUploadBtn = document.getElementById('map-upload-btn');
+            const mapUploadInput = document.getElementById('map-upload-input');
+            const clearDrawingsBtn = document.getElementById('clear-drawings');
+            const clearBoardBtn = document.getElementById('clear-board');
+            const uploadPrompt = document.getElementById('upload-prompt');
+            
+            const mapCtx = mapCanvas.getContext('2d');
+            const gridCtx = gridCanvas.getContext('2d');
+            const objectsCtx = objectsCanvas.getContext('2d');
+            const drawingCtx = drawingCanvas.getContext('2d');
+            
+            let isDrawing = false;
+            let isDragging = false;
+            let draggedItem = null; 
+            let selectedObject = null;
+            let dragOffsetX, dragOffsetY;
+            let placedObjects = [];
+            let volunteerCounter = 1; // Contador para nombres por defecto de voluntarios
+            
+            const toolState = { currentTool: 'pen', color: '#FF6B00', size: 3 };
+
+            function resizeCanvases() {
+                const rect = canvasContainer.getBoundingClientRect();
+                // Si está oculto, no redimensionar a 0
+                if(rect.width === 0) return; 
+                [mapCanvas, gridCanvas, objectsCanvas, drawingCanvas].forEach(canvas => {
+                    canvas.width = rect.width;
+                    canvas.height = rect.height;
+                });
+                redrawAll();
+            }
+
+            function redrawAll() { drawGrid(); drawObjects(); }
+
+            function drawGrid() {
+                const gridSize = 30;
+                gridCtx.clearRect(0, 0, gridCanvas.width, gridCanvas.height);
+                gridCtx.beginPath();
+                gridCtx.strokeStyle = 'rgba(200, 200, 200, 0.3)';
+                gridCtx.lineWidth = 1;
+                for (let x = 0; x <= gridCanvas.width; x += gridSize) { gridCtx.moveTo(x, 0); gridCtx.lineTo(x, gridCanvas.height); }
+                for (let y = 0; y <= gridCanvas.height; y += gridSize) { gridCtx.moveTo(0, y); gridCtx.lineTo(gridCanvas.width, y); }
+                gridCtx.stroke();
+            }
+
+            function handleImage(file) {
+                if (file && file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            mapCtx.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
+                            const hRatio = mapCanvas.width / img.width;
+                            const vRatio = mapCanvas.height / img.height;
+                            const ratio = Math.min(hRatio, vRatio);
+                            const centerShift_x = (mapCanvas.width - img.width * ratio) / 2;
+                            const centerShift_y = (mapCanvas.height - img.height * ratio) / 2;
+                            mapCtx.drawImage(img, 0, 0, img.width, img.height, centerShift_x, centerShift_y, img.width * ratio, img.height * ratio);
+                            if(uploadPrompt) uploadPrompt.style.display = 'none';
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            }
+
+            function drawObjects() {
+                objectsCtx.clearRect(0, 0, objectsCanvas.width, objectsCanvas.height);
+                placedObjects.forEach(obj => {
+                    // Fondo
+                    objectsCtx.fillStyle = obj.type === 'Voluntario' ? '#FFF0E6' : 'rgba(255, 255, 255, 0.9)';
+                    objectsCtx.beginPath();
+                    objectsCtx.arc(obj.x, obj.y, 18, 0, Math.PI * 2);
+                    objectsCtx.fill();
+                    objectsCtx.strokeStyle = obj.type === 'Voluntario' ? '#FF6B00' : '#002855';
+                    objectsCtx.lineWidth = 2;
+                    objectsCtx.stroke();
+
+                    // Etiqueta Textual
+                    objectsCtx.fillStyle = '#002855';
+                    objectsCtx.font = 'bold 12px Arial';
+                    objectsCtx.textAlign = 'center';
+                    objectsCtx.textBaseline = 'middle';
+                    
+                    // Si es voluntario, dibujar icon + texto debajo
+                    if(obj.type === 'Voluntario') {
+                        objectsCtx.font = '16px Arial';
+                        objectsCtx.fillText('👷', obj.x, obj.y - 2);
+                        objectsCtx.font = 'bold 11px Arial';
+                        // Fondo para el nombre
+                        const textWidth = objectsCtx.measureText(obj.label).width;
+                        objectsCtx.fillStyle = 'rgba(255,255,255,0.8)';
+                        objectsCtx.fillRect(obj.x - textWidth/2 - 2, obj.y + 10, textWidth + 4, 14);
+                        objectsCtx.fillStyle = '#FF6B00';
+                        objectsCtx.fillText(obj.label, obj.x, obj.y + 17);
+                    } else {
+                        objectsCtx.fillText(obj.label, obj.x, obj.y);
+                    }
+                });
+            }
+
+            function getObjectAtPosition(x, y) {
+                for (let i = placedObjects.length - 1; i >= 0; i--) {
+                    const obj = placedObjects[i];
+                    if (Math.hypot(x - obj.x, y - obj.y) < 20) return obj;
+                }
+                return null;
+            }
+
+            function updateBrush() {
+                drawingCtx.lineCap = 'round';
+                drawingCtx.lineJoin = 'round';
+                if(toolState.currentTool === 'pen'){
+                    drawingCtx.globalCompositeOperation = 'source-over';
+                    drawingCtx.strokeStyle = toolState.color;
+                    drawingCtx.lineWidth = toolState.size;
+                } else if (toolState.currentTool === 'eraser'){
+                    drawingCtx.globalCompositeOperation = 'destination-out';
+                    drawingCtx.lineWidth = toolState.size * 5; 
+                }
+            }
+
+            function getCanvasCoords(e) {
+                const rect = drawingCanvas.getBoundingClientRect();
+                const touch = e.touches ? e.touches[0] : null;
+                return {
+                    x: (touch ? touch.clientX : e.clientX) - rect.left,
+                    y: (touch ? touch.clientY : e.clientY) - rect.top
+                };
+            }
+
+            // Drag & Drop Listeners
+            resourceLibrary.addEventListener('dragstart', (e) => {
+                const item = e.target.closest('.resource-item');
+                if (item) draggedItem = { type: item.dataset.type, label: item.dataset.label };
+            });
+
+            canvasContainer.addEventListener('dragover', e => e.preventDefault());
+            canvasContainer.addEventListener('drop', (e) => {
+                e.preventDefault();
+                if (draggedItem) {
+                    const { x, y } = getCanvasCoords(e);
+                    
+                    // LÓGICA DE VOLUNTARIO (Solicitar Nombre)
+                    if(draggedItem.type === 'Voluntario') {
+                        let volName = prompt("Ingrese nombre, identificador o unidad del voluntario:", `Voluntario ${volunteerCounter}`);
+                        if(volName !== null) {
+                            if(volName.trim() === "") volName = `Voluntario ${volunteerCounter}`;
+                            draggedItem.label = volName;
+                            volunteerCounter++;
+                        } else {
+                            draggedItem = null; // Se canceló
+                            return;
+                        }
+                    }
+
+                    placedObjects.push({ id: Date.now(), ...draggedItem, x, y });
+                    drawObjects();
+                    if(uploadPrompt) uploadPrompt.style.display = 'none';
+                    draggedItem = null;
+                }
+                if (e.dataTransfer && e.dataTransfer.files.length > 0) handleImage(e.dataTransfer.files[0]);
+            });
+
+            // Canvas Drawing Events
+            const startInteraction = (e) => {
+                const { x, y } = getCanvasCoords(e);
+                selectedObject = getObjectAtPosition(x, y);
+                if (selectedObject) { 
+                    isDragging = true; 
+                    dragOffsetX = x - selectedObject.x; 
+                    dragOffsetY = y - selectedObject.y; 
+                } else { 
+                    isDrawing = true;
+                    drawingCtx.beginPath();
+                    drawingCtx.moveTo(x, y);
+                    updateBrush();
+                }
+            };
+
+            const moveInteraction = (e) => {
+                if (isDragging && selectedObject) {
+                    const { x, y } = getCanvasCoords(e);
+                    selectedObject.x = x - dragOffsetX;
+                    selectedObject.y = y - dragOffsetY;
+                    drawObjects();
+                } else if (isDrawing) { 
+                    const { x, y } = getCanvasCoords(e);
+                    drawingCtx.lineTo(x, y);
+                    drawingCtx.stroke();
+                }
+            };
+
+            const endInteraction = () => {
+                if(isDragging) { isDragging = false; selectedObject = null; } 
+                if(isDrawing) { drawingCtx.closePath(); isDrawing = false; }
+            };
+
+            drawingCanvas.addEventListener('mousedown', startInteraction);
+            drawingCanvas.addEventListener('mousemove', moveInteraction);
+            drawingCanvas.addEventListener('mouseup', endInteraction);
+            drawingCanvas.addEventListener('mouseout', endInteraction);
+            // Touch Support
+            drawingCanvas.addEventListener('touchstart', (e) => { e.preventDefault(); startInteraction(e); }, {passive: false});
+            drawingCanvas.addEventListener('touchmove', (e) => { e.preventDefault(); moveInteraction(e); }, {passive: false});
+            drawingCanvas.addEventListener('touchend', endInteraction);
+
+            // Tools & Buttons
+            mapUploadBtn.addEventListener('click', () => mapUploadInput.click());
+            mapUploadInput.addEventListener('change', (e) => handleImage(e.target.files[0]));
+            
+            document.addEventListener('paste', (e) => {
+                if(document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+                const items = e.clipboardData.items;
+                for (const item of items) {
+                    if (item.type.indexOf('image') !== -1) { handleImage(item.getAsFile()); break; }
+                }
+            });
+
+            colorPicker.addEventListener('input', (e) => toolState.color = e.target.value);
+            brushSize.addEventListener('input', (e) => toolState.size = e.target.value);
+            
+            penTool.addEventListener('click', () => {
+                toolState.currentTool = 'pen';
+                penTool.classList.add('active-tool', 'bg-dcc-blue', 'text-white');
+                eraserTool.classList.remove('active-tool', 'bg-dcc-blue', 'text-white');
+                drawingCanvas.style.cursor = 'crosshair';
+            });
+            
+            eraserTool.addEventListener('click', () => {
+                toolState.currentTool = 'eraser';
+                eraserTool.classList.add('active-tool', 'bg-dcc-blue', 'text-white');
+                penTool.classList.remove('active-tool', 'bg-dcc-blue', 'text-white');
+                drawingCanvas.style.cursor = 'cell';
+            });
+
+            clearDrawingsBtn.addEventListener('click', () => drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height));
+            
+            clearBoardBtn.addEventListener('click', () => {
+                if(confirm('¿Limpiar todo el plano?')){
+                    mapCtx.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
+                    drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+                    placedObjects = [];
+                    drawObjects();
+                    if(uploadPrompt) uploadPrompt.style.display = 'flex';
+                }
+            });
+
+            window.addEventListener('resize', resizeCanvases);
+            setTimeout(resizeCanvases, 200);
+
+            // --- Lógica Tablas SCI ---
+            window.addPatientRow = function() {
+                const tbody = document.getElementById('sci207-body');
+                const row = document.createElement('tr');
+                row.className = "border-b hover:bg-red-50";
+                row.innerHTML = `
+                    <td class="px-2 py-1"><input type="text" class="w-full text-xs p-1 border rounded outline-none" placeholder="Nombre/CC"></td>
+                    <td class="px-2 py-1"><input type="text" class="w-full text-xs p-1 border rounded outline-none" placeholder="Trauma/Quemadura..."></td>
+                    <td class="px-2 py-1">
+                        <select class="w-full text-xs p-1 border rounded outline-none appearance-none">
+                            <option value="verde">🟢 Verde</option>
+                            <option value="amarillo">🟡 Amarillo</option>
+                            <option value="rojo">🔴 Rojo</option>
+                            <option value="negro">⚫ Negro</option>
+                        </select>
+                    </td>
+                    <td class="px-2 py-1"><input type="text" class="w-full text-xs p-1 border rounded outline-none" placeholder="Hospital/Morgue"></td>
+                    <td class="px-2 py-1 text-center no-print">
+                        <button onclick="this.closest('tr').remove()" class="text-red-500 hover:text-red-700 font-bold" title="Eliminar">&times;</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            };
+
+            window.addLogEntry = function() {
+                const tbody = document.getElementById('sci211-body');
+                const row = document.createElement('tr');
+                const now = new Date();
+                const timeString = now.toTimeString().substring(0,5);
+                
+                row.className = "border-b hover:bg-blue-50";
+                row.innerHTML = `
+                    <td class="px-2 py-1"><input type="time" class="w-full text-xs p-1 border rounded outline-none" value="${timeString}"></td>
+                    <td class="px-2 py-1"><input type="text" class="w-full text-xs p-1 border rounded outline-none" placeholder="Descripción..."></td>
+                    <td class="px-2 py-1"><input type="text" class="w-full text-xs p-1 border rounded outline-none" placeholder="Cargo/Persona"></td>
+                    <td class="px-2 py-1 text-center no-print">
+                        <button onclick="this.closest('tr').remove()" class="text-red-500 hover:text-red-700 font-bold" title="Eliminar">&times;</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            };
+
+            addPatientRow();
+            addLogEntry();
+        });
+    </script>
+</body>
+</html>
