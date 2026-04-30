@@ -483,14 +483,19 @@
         // =========================================================================================
         // 🚨 CONFIGURACIÓN DE SERVIDOR GPS (FIREBASE) - INSTRUCCIONES DE CIBERSEGURIDAD 🚨
         // =========================================================================================
-        // MITO: "Si pongo mis llaves aquí me pueden robar los datos".
-        // REALIDAD: En arquitecturas Serverless (Firebase), la clave 'apiKey' es pública por diseño.
-        // La verdadera seguridad (Autorización) se configura EN LA NUBE.
-        // Debe ir a su consola de Firebase -> Firestore Database -> Rules (Reglas).
-        // Configure reglas estrictas que solo permitan leer/escribir bajo condiciones específicas.
+        // A continuación, reemplace el contenido de CUSTOM_FIREBASE_CONFIG con sus credenciales reales
+        // obtenidas desde la consola de Firebase.
         // =========================================================================================
         
-        const CUSTOM_FIREBASE_CONFIG = null; 
+        const CUSTOM_FIREBASE_CONFIG = {
+            apiKey: "AIzaSyDlkkQdkBgD_1ZBvnLuTz0UGvixMNF5CAU",
+            authDomain: "dcc-tactico-sci.firebaseapp.com",
+            projectId: "dcc-tactico-sci",
+            storageBucket: "dcc-tactico-sci.firebasestorage.app",
+            messagingSenderId: "588265970008",
+            appId: "1:588265970008:web:159767b35994d906eb2d2d",
+            measurementId: "G-8EDJHN6XS9"
+        }; 
         
         // =========================================================================================
         
@@ -526,7 +531,7 @@
             let db, auth, appId;
             try {
                 // Toma la configuración personalizada si existe, sino usa la de prueba local del entorno de desarrollo.
-                const firebaseConfig = CUSTOM_FIREBASE_CONFIG || (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null);
+                const firebaseConfig = (CUSTOM_FIREBASE_CONFIG && Object.keys(CUSTOM_FIREBASE_CONFIG).length > 0) ? CUSTOM_FIREBASE_CONFIG : (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null);
                 appId = typeof __app_id !== 'undefined' ? escapeHTML(__app_id) : 'dcc-tactico-local';
 
                 if (firebaseConfig && Object.keys(firebaseConfig).length > 0) {
@@ -633,7 +638,7 @@
                 const safeName = data ? escapeHTML(data.name) : '';
                 
                 // NOTA: Se cambió la función inline del onkeydown para usar un validador (escapeHTML básico aplicado en el proceso de inyección, 
-                // aunque el uso manual del DOM textContent es preferible, se escapa por seguridad)
+                // aunque el manual DOM textContent es preferible, se escapa por seguridad)
                 div.innerHTML = `
                     <button onclick="this.parentElement.remove()" class="absolute top-1 right-1 text-red-500 font-bold no-print text-base leading-none">&times;</button>
                     <div class="flex gap-1 mb-1 pr-4"><select class="grp-type p-1 border border-gray-300 rounded outline-none bg-gray-50 w-1/3 font-semibold text-dcc-blue text-[10px] md:text-xs"><option value="Grupo">Grupo</option><option value="Fuerza Tarea">Fuerza Tarea</option><option value="Equipo">Eq. Intervención</option></select><input type="text" class="grp-name w-2/3 p-1 border border-gray-300 rounded outline-none text-[10px] md:text-xs" placeholder="Indicativo (Ej. Alfa 1)" value="${safeName}"></div>
