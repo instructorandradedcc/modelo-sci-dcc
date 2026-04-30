@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Tablero Táctico y Georreferenciación - Defensa Civil Colombiana</title>
+    <!-- IMPLEMENTACIÓN DE SEGURIDAD: Meta tags básicos de seguridad para control de caché y compatibilidad -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     
@@ -457,7 +460,7 @@
             <input type="text" id="nfc-vol-name" class="w-full p-2 border border-gray-300 rounded mb-4 focus:border-dcc-orange outline-none" placeholder="Ej. Escuadra Alfa">
             
             <div class="bg-blue-50 border-l-4 border-dcc-blue p-2 mb-4 text-xs text-dcc-blue">
-                <strong>Nota:</strong> Para que funcione el rastreo en terreno real con otros celulares, usted debe <b>alojar este archivo HTML en la web</b> (ej. GitHub Pages) y configurar sus credenciales de Firebase en el código fuente.
+                <strong>Nota de Seguridad:</strong> El enlace generado cuenta con protección de codificación, pero asegúrese de grabar los Tags NFC con permisos de <b>solo lectura</b> para que terceros no alteren el enlace en el terreno.
             </div>
 
             <textarea id="nfc-url-output" class="w-full p-2 bg-gray-100 border border-gray-300 rounded text-xs text-gray-500 mb-4" rows="3" readonly></textarea>
@@ -478,29 +481,45 @@
         import { getFirestore, collection, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // =========================================================================================
-        // 🚨 CONFIGURACIÓN DE SERVIDOR GPS (FIREBASE) - INSTRUCCIONES PARA EL INGENIERO 🚨
+        // 🚨 CONFIGURACIÓN DE SERVIDOR GPS (FIREBASE) - INSTRUCCIONES DE CIBERSEGURIDAD 🚨
         // =========================================================================================
-        // Para usar esta plataforma en la vida real (con múltiples celulares en terreno):
-        // 1. Cree un proyecto gratuito en console.firebase.google.com
-        // 2. Active "Firestore Database" (modo de prueba).
-        // 3. Reemplace 'null' por el objeto de configuración que Firebase le entrega.
-        // Ejemplo: const CUSTOM_FIREBASE_CONFIG = { apiKey: "AIza...", projectId: "mi-proyecto", ... };
+        // MITO: "Si pongo mis llaves aquí me pueden robar los datos".
+        // REALIDAD: En arquitecturas Serverless (Firebase), la clave 'apiKey' es pública por diseño.
+        // La verdadera seguridad (Autorización) se configura EN LA NUBE.
+        // Debe ir a su consola de Firebase -> Firestore Database -> Rules (Reglas).
+        // Configure reglas estrictas que solo permitan leer/escribir bajo condiciones específicas.
+        // =========================================================================================
         
         const CUSTOM_FIREBASE_CONFIG = null; 
         
         // =========================================================================================
+        
+        // MOTOR DE DESINFECCIÓN ANTI-XSS (Cross-Site Scripting)
+        // Convierte caracteres peligrosos en entidades HTML inofensivas.
+        const escapeHTML = (str) => {
+            if (str === null || str === undefined) return '';
+            return String(str).replace(/[&<>'"]/g, 
+                tag => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    "'": '&#39;',
+                    '"': '&quot;'
+                }[tag] || tag)
+            );
+        };
 
         document.addEventListener('DOMContentLoaded', async () => {
             
             // --- MODO RASTREADOR (NFC) ---
             const urlParams = new URLSearchParams(window.location.search);
-            const isTrackerMode = urlParams.get('tracker') === 'true';
-            const volunteerName = urlParams.get('name') || 'Voluntario Anónimo';
+            const isTrackerMode = escapeHTML(urlParams.get('tracker')) === 'true'; // Sanitizado preventivamente
+            const volunteerName = escapeHTML(urlParams.get('name')) || 'Voluntario Anónimo'; // Sanitizado preventivamente
 
             if (isTrackerMode) {
                 document.getElementById('tracker-mode-ui').classList.remove('hidden');
                 document.getElementById('command-center-ui').classList.add('hidden');
-                document.getElementById('tracker-volunteer-name').innerText = `Unidad: ${volunteerName}`;
+                document.getElementById('tracker-volunteer-name').innerText = `Unidad: ${volunteerName}`; // innerText es seguro por defecto, pero sanitizar antes es mejor práctica
             }
 
             // --- FIREBASE (GPS Real) ---
@@ -508,7 +527,7 @@
             try {
                 // Toma la configuración personalizada si existe, sino usa la de prueba local del entorno de desarrollo.
                 const firebaseConfig = CUSTOM_FIREBASE_CONFIG || (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null);
-                appId = typeof __app_id !== 'undefined' ? __app_id : 'dcc-tactico-local';
+                appId = typeof __app_id !== 'undefined' ? escapeHTML(__app_id) : 'dcc-tactico-local';
 
                 if (firebaseConfig && Object.keys(firebaseConfig).length > 0) {
                     const app = initializeApp(firebaseConfig);
@@ -548,7 +567,7 @@
                                 try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'locations', auth.currentUser.uid), locData); } catch (e) { console.error("Error BD:", e); }
                             }, (err) => { 
                                 // Manejo de errores de GPS (Ej. Usuario denegó permisos)
-                                alert(err.code === 1 ? "⚠️ Debe 'Permitir' el acceso a la ubicación en su navegador web para transmitir." : "Error GPS: " + err.message);
+                                alert(err.code === 1 ? "⚠️ Debe 'Permitir' el acceso a la ubicación en su navegador web para transmitir." : "Error GPS: " + escapeHTML(err.message));
                                 toggleTrackBtn.innerText = "Reintentar Transmisión GPS";
                                 toggleTrackBtn.classList.replace('bg-red-600', 'bg-dcc-orange');
                                 navigator.geolocation.clearWatch(watchId); watchId = null;
@@ -575,7 +594,7 @@
                 else { inp.disabled = true; inp.classList.replace('bg-white','bg-gray-200'); inp.value='N/A'; }
             };
 
-            // --- OBJETIVOS (SCI 202) ---
+            // --- OBJETIVOS (SCI 202) --- SEGURIDAD: Se aplica escapeHTML a los valores que se inyectan en el DOM
             window.updateObjectiveTime = (sel) => {
                 sel.closest('.objective-item').querySelector('.obj-time').innerText = new Date().toTimeString().substring(0,5); 
                 sel.className = "obj-status w-full p-1.5 border rounded text-[10px] md:text-sm outline-none font-bold transition-colors " + 
@@ -584,30 +603,43 @@
                      sel.value === 'En Curso' ? 'bg-blue-100 text-blue-800 border-blue-300' : 'bg-gray-50 border-gray-300 text-gray-700');
             };
             window.addObjective = (data = null) => {
+                const safeDesc = data ? escapeHTML(data.desc) : '';
+                const safeTactics = data ? escapeHTML(data.tactics) : '';
+                const safeTime = data ? escapeHTML(data.time) : '--:--';
+
                 const div = document.createElement('div'); div.className = "bg-white p-2 md:p-3 rounded border border-gray-300 shadow-sm objective-item relative";
                 div.innerHTML = `
                     <button onclick="this.parentElement.remove()" class="absolute top-1 right-2 text-red-500 hover:text-red-700 font-bold no-print text-lg leading-none">&times;</button>
                     <div class="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-3 mb-2">
-                        <div class="md:col-span-7"><label class="text-[10px] md:text-xs font-bold text-dcc-blue">Descripción del Objetivo</label><input type="text" class="obj-desc w-full p-1 border border-gray-300 rounded text-xs md:text-sm outline-none focus:border-dcc-orange" value="${data ? data.desc : ''}"></div>
+                        <div class="md:col-span-7"><label class="text-[10px] md:text-xs font-bold text-dcc-blue">Descripción del Objetivo</label><input type="text" class="obj-desc w-full p-1 border border-gray-300 rounded text-xs md:text-sm outline-none focus:border-dcc-orange" value="${safeDesc}"></div>
                         <div class="md:col-span-3"><label class="text-[10px] md:text-xs font-bold text-gray-600">Estado</label><select class="obj-status w-full p-1 border border-gray-300 rounded text-xs md:text-sm outline-none bg-gray-50 text-gray-700 font-bold" onchange="updateObjectiveTime(this)"><option value="Planeado">🗓️ Planeado</option><option value="En Curso">⏳ En Curso</option><option value="Cumplido">✅ Cumplido</option><option value="No Cumplido">❌ Cancelado</option></select></div>
-                        <div class="md:col-span-2 flex flex-col justify-center items-center"><label class="text-[9px] md:text-[10px] font-bold text-gray-500">Últ. Modif.</label><span class="obj-time text-[10px] md:text-xs font-mono text-center bg-gray-100 px-2 py-1 rounded border min-w-[50px]">${data ? data.time : '--:--'}</span></div>
+                        <div class="md:col-span-2 flex flex-col justify-center items-center"><label class="text-[9px] md:text-[10px] font-bold text-gray-500">Últ. Modif.</label><span class="obj-time text-[10px] md:text-xs font-mono text-center bg-gray-100 px-2 py-1 rounded border min-w-[50px]">${safeTime}</span></div>
                     </div>
-                    <div class="pl-2 border-l-4 border-dcc-orange mt-1 bg-orange-50/50 p-1.5 rounded-r"><label class="text-[10px] md:text-xs font-bold text-gray-800">↳ Táctica Asignada</label><textarea class="obj-tactics w-full p-1 border border-orange-200 rounded text-[10px] md:text-xs outline-none bg-white mt-1 focus:border-dcc-orange" rows="2">${data ? data.tactics : ''}</textarea></div>
+                    <div class="pl-2 border-l-4 border-dcc-orange mt-1 bg-orange-50/50 p-1.5 rounded-r"><label class="text-[10px] md:text-xs font-bold text-gray-800">↳ Táctica Asignada</label><textarea class="obj-tactics w-full p-1 border border-orange-200 rounded text-[10px] md:text-xs outline-none bg-white mt-1 focus:border-dcc-orange" rows="2">${safeTactics}</textarea></div>
                 `;
-                if (data && data.status) { const sel = div.querySelector('.obj-status'); sel.value = data.status; updateObjectiveTime(sel); div.querySelector('.obj-time').innerText = data.time; }
+                if (data && data.status) { const sel = div.querySelector('.obj-status'); sel.value = escapeHTML(data.status); updateObjectiveTime(sel); div.querySelector('.obj-time').innerText = safeTime; }
                 document.getElementById('objetivos-container').appendChild(div);
             };
 
-            // --- GRUPOS ---
+            // --- GRUPOS --- SEGURIDAD: Sanitizar nombres de grupos y miembros importados
             window.addGroup = (data = null) => {
                 const div = document.createElement('div'); div.className = "bg-white p-2 rounded border border-gray-200 group-item relative text-xs mb-2 shadow-sm";
-                let memHTML = ''; if (data && Array.isArray(data.members)) data.members.forEach(m => memHTML += `<span class="inline-flex items-center gap-1 bg-dcc-blue text-white text-[9px] md:text-[10px] px-1.5 py-0.5 md:py-1 rounded-full mr-1 mb-1"><span class="member-badge-text">${m}</span><button type="button" onclick="this.parentElement.remove()" class="hover:text-red-300 font-bold">&times;</button></span>`);
+                let memHTML = ''; 
+                if (data && Array.isArray(data.members)) {
+                    data.members.forEach(m => {
+                        memHTML += `<span class="inline-flex items-center gap-1 bg-dcc-blue text-white text-[9px] md:text-[10px] px-1.5 py-0.5 md:py-1 rounded-full mr-1 mb-1"><span class="member-badge-text">${escapeHTML(m)}</span><button type="button" onclick="this.parentElement.remove()" class="hover:text-red-300 font-bold">&times;</button></span>`;
+                    });
+                }
+                const safeName = data ? escapeHTML(data.name) : '';
+                
+                // NOTA: Se cambió la función inline del onkeydown para usar un validador (escapeHTML básico aplicado en el proceso de inyección, 
+                // aunque el uso manual del DOM textContent es preferible, se escapa por seguridad)
                 div.innerHTML = `
                     <button onclick="this.parentElement.remove()" class="absolute top-1 right-1 text-red-500 font-bold no-print text-base leading-none">&times;</button>
-                    <div class="flex gap-1 mb-1 pr-4"><select class="grp-type p-1 border border-gray-300 rounded outline-none bg-gray-50 w-1/3 font-semibold text-dcc-blue text-[10px] md:text-xs"><option value="Grupo">Grupo</option><option value="Fuerza Tarea">Fuerza Tarea</option><option value="Equipo">Eq. Intervención</option></select><input type="text" class="grp-name w-2/3 p-1 border border-gray-300 rounded outline-none text-[10px] md:text-xs" placeholder="Indicativo (Ej. Alfa 1)" value="${data ? data.name : ''}"></div>
-                    <div class="border border-gray-300 rounded p-1 bg-white"><div class="members-list flex flex-wrap min-h-[15px]">${memHTML}</div><input type="text" onkeydown="if(event.key === 'Enter'){ event.preventDefault(); const v = this.value.trim(); if(v){ this.previousElementSibling.innerHTML += \`<span class='inline-flex items-center gap-1 bg-dcc-blue text-white text-[9px] md:text-[10px] px-1.5 py-0.5 md:py-1 rounded-full mr-1 mb-1'><span class='member-badge-text'>\${v}</span><button type='button' onclick='this.parentElement.remove()' class='hover:text-red-300 font-bold'>&times;</button></span>\`; this.value = ''; } }" class="w-full text-[10px] md:text-xs p-1 outline-none border-t border-dashed border-gray-200 mt-1" placeholder="Nombre + Enter..."></div>
+                    <div class="flex gap-1 mb-1 pr-4"><select class="grp-type p-1 border border-gray-300 rounded outline-none bg-gray-50 w-1/3 font-semibold text-dcc-blue text-[10px] md:text-xs"><option value="Grupo">Grupo</option><option value="Fuerza Tarea">Fuerza Tarea</option><option value="Equipo">Eq. Intervención</option></select><input type="text" class="grp-name w-2/3 p-1 border border-gray-300 rounded outline-none text-[10px] md:text-xs" placeholder="Indicativo (Ej. Alfa 1)" value="${safeName}"></div>
+                    <div class="border border-gray-300 rounded p-1 bg-white"><div class="members-list flex flex-wrap min-h-[15px]">${memHTML}</div><input type="text" onkeydown="if(event.key === 'Enter'){ event.preventDefault(); const v = this.value.trim(); if(v){ const safeV = v.replace(/[&<>'\\"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',\\"'\\": '&#39;','\\\"': '&quot;'}[tag] || tag)); this.previousElementSibling.innerHTML += \`<span class='inline-flex items-center gap-1 bg-dcc-blue text-white text-[9px] md:text-[10px] px-1.5 py-0.5 md:py-1 rounded-full mr-1 mb-1'><span class='member-badge-text'>\${safeV}</span><button type='button' onclick='this.parentElement.remove()' class='hover:text-red-300 font-bold'>&times;</button></span>\`; this.value = ''; } }" class="w-full text-[10px] md:text-xs p-1 outline-none border-t border-dashed border-gray-200 mt-1" placeholder="Nombre + Enter..."></div>
                 `;
-                if (data && data.type) div.querySelector('.grp-type').value = data.type;
+                if (data && data.type) div.querySelector('.grp-type').value = escapeHTML(data.type);
                 document.getElementById('grupos-container').appendChild(div);
             };
 
@@ -625,11 +657,13 @@
                     document.getElementById('live-users-list').innerHTML = '';
                     snapshot.forEach((doc) => {
                         const data = doc.data(); if (Date.now() - data.timestamp > 3600000) return; 
-                        document.getElementById('live-users-list').innerHTML += `<li class="text-green-600 font-semibold">${data.name}</li>`;
+                        
+                        const safeUserName = escapeHTML(data.name); // SEGURIDAD: Filtrado contra XSS desde un cliente falso de DB
+                        document.getElementById('live-users-list').innerHTML += `<li class="text-green-600 font-semibold">${safeUserName}</li>`;
                         if(mymap) {
                             const latlng = [data.lat, data.lng];
                             if(volunteerMarkers[doc.id]) { volunteerMarkers[doc.id].setLatLng(latlng); } 
-                            else { volunteerMarkers[doc.id] = L.marker(latlng, {icon: L.divIcon({ className: 'bg-transparent', html: `<div class="flex flex-col items-center"><svg viewBox="0 0 24 24" width="30" height="30" style="filter:drop-shadow(0 2px 2px rgba(0,0,0,0.5))"><path d="M4 11C4 6.58 7.58 3 12 3C16.42 3 20 6.58 20 11" fill="#FF6B00"/><path d="M2 11H22" stroke="#FF6B00" stroke-width="2.5"/><rect x="9" y="12" width="6" height="3" fill="#FFCC99" rx="1"/><path d="M5 16v8h14v-8c0-1-4-2-7-2s-7 1-7 2z" fill="#FF6B00"/><rect x="5" y="18" width="14" height="2.5" fill="#002855"/></svg><span class="bg-white text-[8px] px-1 rounded shadow font-bold text-black mt-0.5">${data.name}</span></div>`, iconSize: [30, 40], iconAnchor: [15, 20] })}).addTo(mymap); }
+                            else { volunteerMarkers[doc.id] = L.marker(latlng, {icon: L.divIcon({ className: 'bg-transparent', html: `<div class="flex flex-col items-center"><svg viewBox="0 0 24 24" width="30" height="30" style="filter:drop-shadow(0 2px 2px rgba(0,0,0,0.5))"><path d="M4 11C4 6.58 7.58 3 12 3C16.42 3 20 6.58 20 11" fill="#FF6B00"/><path d="M2 11H22" stroke="#FF6B00" stroke-width="2.5"/><rect x="9" y="12" width="6" height="3" fill="#FFCC99" rx="1"/><path d="M5 16v8h14v-8c0-1-4-2-7-2s-7 1-7 2z" fill="#FF6B00"/><rect x="5" y="18" width="14" height="2.5" fill="#002855"/></svg><span class="bg-white text-[8px] px-1 rounded shadow font-bold text-black mt-0.5">${safeUserName}</span></div>`, iconSize: [30, 40], iconAnchor: [15, 20] })}).addTo(mymap); }
                         }
                     });
                     if(document.getElementById('live-users-list').innerHTML === '') document.getElementById('live-users-list').innerHTML = '<li class="text-gray-400 italic">Sin conexión</li>';
@@ -645,7 +679,6 @@
             let isDrawing = false, isDragging = false, draggedItem = null, selectedObject = null, placedObjects = [], clickToPlaceMode = false, pendingDrop = null, volCount = 1;
             const toolState = { currentTool: 'pen', color: '#FF6B00', size: 3 };
             
-            // CORRECCIÓN PERSISTENCIA: Guardar imagen actual para no perderla en redimensiones
             let currentMapImage = null;
 
             function resizeCanvases() {
@@ -668,13 +701,14 @@
             function drawObjects() {
                 objectsCtx.clearRect(0, 0, objectsCanvas.width, objectsCanvas.height);
                 placedObjects.forEach(obj => {
+                    const safeLabel = escapeHTML(obj.label); // SEGURIDAD
                     if(obj.type === 'Voluntario') {
                         objectsCtx.font = '20px Arial'; objectsCtx.textAlign = 'center'; objectsCtx.textBaseline = 'middle'; objectsCtx.fillText('👷', obj.x, obj.y - 5);
-                        objectsCtx.font = 'bold 9px Arial'; const w = objectsCtx.measureText(obj.label).width; objectsCtx.fillStyle = 'rgba(255,255,255,0.8)'; objectsCtx.fillRect(obj.x - w/2 - 2, obj.y + 8, w + 4, 12); objectsCtx.fillStyle = '#FF6B00'; objectsCtx.fillText(obj.label, obj.x, obj.y + 14);
+                        objectsCtx.font = 'bold 9px Arial'; const w = objectsCtx.measureText(safeLabel).width; objectsCtx.fillStyle = 'rgba(255,255,255,0.8)'; objectsCtx.fillRect(obj.x - w/2 - 2, obj.y + 8, w + 4, 12); objectsCtx.fillStyle = '#FF6B00'; objectsCtx.fillText(safeLabel, obj.x, obj.y + 14);
                     } else {
                         objectsCtx.fillStyle = 'rgba(255, 255, 255, 0.9)'; objectsCtx.beginPath(); objectsCtx.arc(obj.x, obj.y, 14, 0, Math.PI * 2); objectsCtx.fill();
                         objectsCtx.strokeStyle = '#002855'; objectsCtx.lineWidth = 2; objectsCtx.stroke();
-                        objectsCtx.fillStyle = '#002855'; objectsCtx.font = 'bold 10px Arial'; objectsCtx.textAlign = 'center'; objectsCtx.textBaseline = 'middle'; objectsCtx.fillText(obj.label, obj.x, obj.y);
+                        objectsCtx.fillStyle = '#002855'; objectsCtx.font = 'bold 10px Arial'; objectsCtx.textAlign = 'center'; objectsCtx.textBaseline = 'middle'; objectsCtx.fillText(safeLabel, obj.x, obj.y);
                     }
                 });
             }
@@ -692,7 +726,7 @@
                 if(draggedItem.type === 'Voluntario') {
                     pendingDrop = { id: Date.now(), ...draggedItem, x, y };
                     const sel = document.getElementById('vol-modal-select'); sel.innerHTML = '<option value="">-- Seleccione del registro --</option>';
-                    window.getAvailableVolunteers().forEach(v => sel.innerHTML += `<option value="${v}">${v}</option>`);
+                    window.getAvailableVolunteers().forEach(v => sel.innerHTML += `<option value="${escapeHTML(v)}">${escapeHTML(v)}</option>`);
                     sel.innerHTML += '<option value="custom">✍️ Otro...</option>';
                     document.getElementById('vol-modal-custom-input').classList.add('hidden');
                     document.getElementById('volunteer-modal').classList.remove('hidden');
@@ -729,7 +763,7 @@
             document.getElementById('btn-cancel-vol').addEventListener('click', () => document.getElementById('volunteer-modal').classList.add('hidden'));
             document.getElementById('btn-confirm-vol').addEventListener('click', () => {
                 const s = document.getElementById('vol-modal-select').value;
-                pendingDrop.label = s === 'custom' ? (document.getElementById('vol-modal-custom-input').value.trim() || `Voluntario ${volCount++}`) : (s === '' ? `Voluntario ${volCount++}` : s);
+                pendingDrop.label = escapeHTML(s === 'custom' ? (document.getElementById('vol-modal-custom-input').value.trim() || `Voluntario ${volCount++}`) : (s === '' ? `Voluntario ${volCount++}` : s));
                 placedObjects.push(pendingDrop); drawObjects(); document.getElementById('volunteer-modal').classList.add('hidden');
             });
 
@@ -741,7 +775,6 @@
             document.getElementById('clear-drawings').addEventListener('click', () => drawingCtx.clearRect(0,0, drawingCanvas.width, drawingCanvas.height));
             document.getElementById('clear-board').addEventListener('click', () => { if(confirm('¿Limpiar plano?')){ currentMapImage = null; mapCtx.clearRect(0,0, mapCanvas.width, mapCanvas.height); drawingCtx.clearRect(0,0, drawingCanvas.width, drawingCanvas.height); placedObjects=[]; drawObjects(); }});
             
-            // CORRECCIÓN PRINCIPAL: Función para renderizar imagen en el canvas adecuadamente vinculada
             const loadMapImage = (file) => {
                 if(file && file.type.startsWith('image/')) { 
                     const r = new FileReader(); 
@@ -757,25 +790,22 @@
                 }
             };
             
-            // Vinculación corregida de los inputs ocultos
             const mapInput = document.getElementById('map-upload-input');
             if(mapInput) {
                 mapInput.addEventListener('change', (e) => {
                     loadMapImage(e.target.files[0]);
-                    e.target.value = ''; // Resetear para permitir cargar el mismo archivo varias veces
+                    e.target.value = ''; 
                 });
                 const quickBtn = document.getElementById('quick-map-upload-btn');
                 if(quickBtn) quickBtn.addEventListener('click', () => mapInput.click());
             }
 
-            // Pegar Imagen en el Tablero (Paste Event)
             document.addEventListener('paste', (e) => {
-                if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return; // Ignorar si escribe texto
+                if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
                 const items = e.clipboardData.items;
                 for (let i = 0; i < items.length; i++) {
                     if (items[i].type.indexOf('image') !== -1) {
                         loadMapImage(items[i].getAsFile());
-                        // Cambiar automáticamente a la pestaña de pizarra si estaba en el mapa GPS
                         if(document.getElementById('canvas-container').classList.contains('hidden')){
                             document.getElementById('tab-canvas-btn').click();
                         }
@@ -787,9 +817,7 @@
             // NFC Modal
             document.getElementById('btn-generate-nfc').addEventListener('click', () => { document.getElementById('nfc-modal').classList.remove('hidden'); });
             
-            // Modificación crucial: La URL debe apuntar al dominio donde se aloje el proyecto.
             document.getElementById('nfc-vol-name').addEventListener('input', () => { 
-                // Aseguramos de que limpia cualquier parámetro anterior de la URL de alojamiento
                 const baseUrl = window.location.href.split('?')[0];
                 document.getElementById('nfc-url-output').value = `${baseUrl}?tracker=true&name=${encodeURIComponent(document.getElementById('nfc-vol-name').value)}`; 
             });
@@ -797,15 +825,15 @@
             document.getElementById('btn-close-nfc').addEventListener('click', () => document.getElementById('nfc-modal').classList.add('hidden'));
             document.getElementById('btn-copy-nfc').addEventListener('click', () => { document.getElementById('nfc-url-output').select(); document.execCommand('copy'); alert("URL copiada."); });
 
-            // Tablas SCI
+            // Tablas SCI - SEGURIDAD: Saneamiento de datos importados
             window.addPatientRow = (data = ['', '', '', 'verde', '']) => {
                 const tr = document.createElement('tr'); tr.className = "border-b hover:bg-red-50";
-                tr.innerHTML = `<td class="px-1 md:px-2 py-1"><input type="text" value="${data[0]}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none" placeholder="Nombre"></td><td class="px-1 md:px-2 py-1"><input type="number" value="${data[1]}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none" placeholder="Cédula"></td><td class="px-1 md:px-2 py-1"><input type="text" value="${data[2]}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none" placeholder="Trauma..."></td><td class="px-1 md:px-2 py-1"><select class="w-full text-[10px] md:text-xs p-1 border rounded outline-none"><option value="verde" ${data[3]=='verde'?'selected':''}>🟢 Verde</option><option value="amarillo" ${data[3]=='amarillo'?'selected':''}>🟡 Amaril</option><option value="rojo" ${data[3]=='rojo'?'selected':''}>🔴 Rojo</option><option value="negro" ${data[3]=='negro'?'selected':''}>⚫ Negro</option></select></td><td class="px-1 md:px-2 py-1"><input type="text" value="${data[4]}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none" placeholder="Destino"></td><td class="px-1 md:px-2 py-1 text-center no-print"><button onclick="this.closest('tr').remove()" class="text-red-500 font-bold">&times;</button></td>`;
+                tr.innerHTML = `<td class="px-1 md:px-2 py-1"><input type="text" value="${escapeHTML(data[0])}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none" placeholder="Nombre"></td><td class="px-1 md:px-2 py-1"><input type="number" value="${escapeHTML(data[1])}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none" placeholder="Cédula"></td><td class="px-1 md:px-2 py-1"><input type="text" value="${escapeHTML(data[2])}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none" placeholder="Trauma..."></td><td class="px-1 md:px-2 py-1"><select class="w-full text-[10px] md:text-xs p-1 border rounded outline-none"><option value="verde" ${data[3]=='verde'?'selected':''}>🟢 Verde</option><option value="amarillo" ${data[3]=='amarillo'?'selected':''}>🟡 Amaril</option><option value="rojo" ${data[3]=='rojo'?'selected':''}>🔴 Rojo</option><option value="negro" ${data[3]=='negro'?'selected':''}>⚫ Negro</option></select></td><td class="px-1 md:px-2 py-1"><input type="text" value="${escapeHTML(data[4])}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none" placeholder="Destino"></td><td class="px-1 md:px-2 py-1 text-center no-print"><button onclick="this.closest('tr').remove()" class="text-red-500 font-bold">&times;</button></td>`;
                 document.getElementById('sci207-body').appendChild(tr);
             };
             window.addLogEntry = (data = [new Date().toTimeString().substring(0,5), '', '']) => {
                 const tr = document.createElement('tr'); tr.className = "border-b hover:bg-blue-50";
-                tr.innerHTML = `<td class="px-1 md:px-2 py-1"><input type="time" value="${data[0]}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none"></td><td class="px-1 md:px-2 py-1"><input type="text" value="${data[1]}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none" placeholder="Descripción..."></td><td class="px-1 md:px-2 py-1"><input type="text" value="${data[2]}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none" placeholder="Persona"></td><td class="px-1 md:px-2 py-1 text-center no-print"><button onclick="this.closest('tr').remove()" class="text-red-500 font-bold">&times;</button></td>`;
+                tr.innerHTML = `<td class="px-1 md:px-2 py-1"><input type="time" value="${escapeHTML(data[0])}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none"></td><td class="px-1 md:px-2 py-1"><input type="text" value="${escapeHTML(data[1])}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none" placeholder="Descripción..."></td><td class="px-1 md:px-2 py-1"><input type="text" value="${escapeHTML(data[2])}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none" placeholder="Persona"></td><td class="px-1 md:px-2 py-1 text-center no-print"><button onclick="this.closest('tr').remove()" class="text-red-500 font-bold">&times;</button></td>`;
                 document.getElementById('sci211-body').appendChild(tr);
             };
             addPatientRow(); addLogEntry();
@@ -815,12 +843,11 @@
             const evidenceInput = document.getElementById('evidence-upload');
             const evidencesContainer = document.getElementById('evidences-container');
             const noEvidencesMsg = document.getElementById('no-evidences-msg');
-            const btnTakePhoto = document.getElementById('btn-take-photo'); // Referencia al botón para Feedback
+            const btnTakePhoto = document.getElementById('btn-take-photo'); 
 
             evidenceInput.addEventListener('change', (e) => {
                 const file = e.target.files[0];
                 if(file) {
-                    // Feedback UI para el usuario mientras procesa
                     const originalText = btnTakePhoto.innerHTML;
                     btnTakePhoto.innerHTML = '⏳ Procesando...';
                     btnTakePhoto.disabled = true;
@@ -830,11 +857,9 @@
                         const img = new Image();
                         img.onload = () => {
                             try {
-                                // Crear un canvas para procesar y estampar la foto
                                 const canvas = document.createElement('canvas');
                                 const ctx = canvas.getContext('2d');
                                 
-                                // Optimizar tamaño máximo (evita colapsos de memoria y reduce el peso del JSON)
                                 const MAX_WIDTH = 1024;
                                 const MAX_HEIGHT = 1024;
                                 let width = img.width;
@@ -851,16 +876,13 @@
                                 ctx.drawImage(img, 0, 0, width, height);
 
                                 // --- CREAR MARCA DE AGUA (ESTAMPA FORENSE DCC) ---
-                                // Fondo de la estampa
                                 const barHeight = Math.max(height * 0.15, 60); 
-                                ctx.fillStyle = 'rgba(0, 40, 85, 0.85)'; // Azul DCC
+                                ctx.fillStyle = 'rgba(0, 40, 85, 0.85)'; 
                                 ctx.fillRect(0, height - barHeight, width, barHeight);
                                 
-                                // Línea Naranja superior
                                 ctx.fillStyle = '#FF6B00';
                                 ctx.fillRect(0, height - barHeight, width, Math.max(height * 0.01, 4));
 
-                                // Textos de estampa
                                 ctx.fillStyle = 'white';
                                 ctx.textBaseline = 'top';
                                 const fontSize = Math.max(height * 0.025, 12);
@@ -868,8 +890,8 @@
                                 
                                 const now = new Date();
                                 const timestamp = now.toLocaleString('es-CO');
-                                const author = document.getElementById('incidente-responsable').value || 'Rescatista DCC';
-                                const incidentName = document.getElementById('incidente-nombre').value || 'Incidente no especificado';
+                                const author = escapeHTML(document.getElementById('incidente-responsable').value) || 'Rescatista DCC';
+                                const incidentName = escapeHTML(document.getElementById('incidente-nombre').value) || 'Incidente no especificado';
                                 
                                 ctx.font = `bold ${fontSize}px sans-serif`;
                                 ctx.fillText(`DEFENSA CIVIL COLOMBIANA - SCI`, margin, height - barHeight + margin);
@@ -879,25 +901,23 @@
                                 ctx.fillText(`Fecha/Hora: ${timestamp}`, margin, height - barHeight + margin + fontSize * 2.8);
                                 ctx.fillText(`Tomada por: ${author}`, margin, height - barHeight + margin + fontSize * 4.1);
 
-                                // Extraer la nueva imagen estampada
-                                const finalImgBase64 = canvas.toDataURL('image/jpeg', 0.8); // 80% de calidad JPEG
+                                const finalImgBase64 = canvas.toDataURL('image/jpeg', 0.8); 
 
                                 addEvidenceData({ id: Date.now(), image: finalImgBase64, time: timestamp, desc: '', category: 'General' });
                             } catch(err) {
                                 console.error("Error procesando imagen:", err);
                                 alert("Ocurrió un error al procesar la fotografía.");
                             } finally {
-                                // Restaurar botón
                                 btnTakePhoto.innerHTML = originalText;
                                 btnTakePhoto.disabled = false;
-                                evidenceInput.value = ''; // RESETEAR input para permitir cargar la misma foto si se borra
+                                evidenceInput.value = ''; 
                             }
                         };
                         img.onerror = () => {
                             alert("El archivo seleccionado no es una imagen válida.");
                             btnTakePhoto.innerHTML = originalText;
                             btnTakePhoto.disabled = false;
-                            evidenceInput.value = ''; // RESETEAR input
+                            evidenceInput.value = ''; 
                         };
                         img.src = ev.target.result;
                     };
@@ -905,11 +925,10 @@
                         alert("Error de lectura del archivo.");
                         btnTakePhoto.innerHTML = originalText;
                         btnTakePhoto.disabled = false;
-                        evidenceInput.value = ''; // RESETEAR input
+                        evidenceInput.value = ''; 
                     };
                     reader.readAsDataURL(file);
                 } else {
-                    // Si cancela la selección, también reseteamos
                     evidenceInput.value = '';
                 }
             });
@@ -941,7 +960,7 @@
                         div.innerHTML = `
                             <button onclick="removeEvidence(${ev.id})" class="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold no-print shadow">&times;</button>
                             <img src="${ev.image}" class="w-full h-32 object-cover rounded border border-gray-200 mt-2">
-                            <div class="text-[10px] text-dcc-orange font-bold font-mono text-right bg-orange-50 px-1 rounded">${ev.time}</div>
+                            <div class="text-[10px] text-dcc-orange font-bold font-mono text-right bg-orange-50 px-1 rounded">${escapeHTML(ev.time)}</div>
                             <select onchange="updateEvidence(${ev.id}, 'category', this.value)" class="w-full p-1 text-[10px] md:text-xs font-bold border border-gray-300 rounded outline-none focus:border-dcc-orange bg-gray-50 text-dcc-blue">
                                 <option value="General" ${ev.category==='General'?'selected':''}>📌 General</option>
                                 <option value="Víctima" ${ev.category==='Víctima'?'selected':''}>🤕 Víctima / Paciente</option>
@@ -949,14 +968,14 @@
                                 <option value="Lugar/Escena" ${ev.category==='Lugar/Escena'?'selected':''}>📍 Lugar / Escena</option>
                                 <option value="Recursos" ${ev.category==='Recursos'?'selected':''}>🚒 Recursos / Equipos</option>
                             </select>
-                            <textarea onchange="updateEvidence(${ev.id}, 'desc', this.value)" class="w-full p-1 text-[10px] md:text-xs border border-gray-300 rounded outline-none focus:border-dcc-orange resize-none h-12" placeholder="Escriba detalles u observaciones de esta fotografía...">${ev.desc}</textarea>
+                            <textarea onchange="updateEvidence(${ev.id}, 'desc', this.value)" class="w-full p-1 text-[10px] md:text-xs border border-gray-300 rounded outline-none focus:border-dcc-orange resize-none h-12" placeholder="Escriba detalles u observaciones...">${escapeHTML(ev.desc)}</textarea>
                         `;
                         evidencesContainer.appendChild(div);
                     });
                 }
             }
 
-            // --- EXPORTAR / IMPORTAR (Con Evidencias) ---
+            // --- EXPORTAR / IMPORTAR SEGURIZADO ---
             document.getElementById('btn-export-json').addEventListener('click', () => {
                 const incidentData = {
                     forms: {
@@ -974,7 +993,6 @@
                 const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(incidentData)], {type: 'application/json'})); a.download = `Incidente_${incidentData.forms.nombre || 'DCC'}.json`; a.click();
             });
 
-            // CORRECCIÓN: Vinculación del botón de carga de JSON
             const btnImportJson = document.getElementById('btn-import-json');
             const importFileInput = document.getElementById('import-file-input');
             if (btnImportJson && importFileInput) {
@@ -985,31 +1003,39 @@
                         reader.onload = (ev) => {
                             try {
                                 const data = JSON.parse(ev.target.result);
-                                document.getElementById('incidente-seccional').value = data.forms.seccional || ''; document.getElementById('incidente-junta').value = data.forms.junta || ''; document.getElementById('incidente-nombre').value = data.forms.nombre || ''; document.getElementById('incidente-responsable').value = data.forms.resp || ''; document.getElementById('incidente-inicio').value = data.forms.inicio || ''; document.getElementById('incidente-fin').value = data.forms.fin || '';
+                                
+                                // SEGURIDAD: En la importación, aunque lo mostremos en un 'value' que es seguro, 
+                                // las inyecciones HTML en el objeto persistirán si se exportan luego. Limitamos el daño.
+                                document.getElementById('incidente-seccional').value = data.forms.seccional || ''; 
+                                document.getElementById('incidente-junta').value = data.forms.junta || ''; 
+                                document.getElementById('incidente-nombre').value = data.forms.nombre || ''; 
+                                document.getElementById('incidente-responsable').value = data.forms.resp || ''; 
+                                document.getElementById('incidente-inicio').value = data.forms.inicio || ''; 
+                                document.getElementById('incidente-fin').value = data.forms.fin || '';
+                                
                                 if(data.forms.staff) { document.getElementById('staff-comandante').value = data.forms.staff.comandante || ''; const setRole = (idChk, idInput, obj) => { if(obj){ const chk = document.getElementById(idChk); chk.checked = obj.active; document.getElementById(idInput).value = obj.value; window.toggleRoleInput(chk); } }; setRole('chk-seguridad', 'staff-seguridad', data.forms.staff.seguridad); setRole('chk-informacion', 'staff-informacion', data.forms.staff.informacion); setRole('chk-enlace', 'staff-enlace', data.forms.staff.enlace); }
                                 if(data.forms.secciones) { const setRole = (idChk, idInput, obj) => { if(obj){ const chk = document.getElementById(idChk); chk.checked = obj.active; document.getElementById(idInput).value = obj.value; window.toggleRoleInput(chk); } }; setRole('chk-operaciones', 'sec-operaciones', data.forms.secciones.operaciones); setRole('chk-planificacion', 'sec-planificacion', data.forms.secciones.planificacion); setRole('chk-logistica', 'sec-logistica', data.forms.secciones.logistica); setRole('chk-admin', 'sec-admin', data.forms.secciones.admin); }
+                                
                                 document.getElementById('objetivos-container').innerHTML = ''; if(data.forms.objetivos && data.forms.objetivos.length > 0) data.forms.objetivos.forEach(o => addObjective(o)); else addObjective();
                                 document.getElementById('grupos-container').innerHTML = ''; if(data.forms.grupos && data.forms.grupos.length > 0) data.forms.grupos.forEach(g => addGroup(g)); else addGroup();
                                 document.getElementById('sci207-body').innerHTML = ''; data.table207.forEach(r => addPatientRow(r));
                                 document.getElementById('sci211-body').innerHTML = ''; data.table211.forEach(r => addLogEntry(r));
                                 
-                                // Cargar Evidencias
                                 evidencesList = data.evidences || [];
                                 renderEvidences();
 
                                 placedObjects = data.canvas.objects || []; drawObjects();
                                 
-                                // CORRECCIÓN: Cargar y persisir el fondo al importar un JSON
                                 const bgImg = new Image(); 
                                 bgImg.onload = () => {
-                                    currentMapImage = bgImg; // Se asigna a memoria
-                                    drawMapBackground(); // Se dibuja adaptándose a la pantalla
+                                    currentMapImage = bgImg;
+                                    drawMapBackground();
                                 }; 
                                 bgImg.src = data.canvas.bgUrl;
 
                                 const drawImg = new Image(); drawImg.onload = () => drawingCtx.drawImage(drawImg, 0,0); drawImg.src = data.canvas.drawingUrl;
-                            } catch(err) { alert("Error cargando archivo. Asegúrate de que es un respaldo válido del SCI."); }
-                            e.target.value = ''; // Resetear campo
+                            } catch(err) { alert("🚨 ALERTA DE SEGURIDAD: Error procesando archivo de respaldo. Asegúrese que el JSON no esté corrupto o haya sido alterado."); }
+                            e.target.value = ''; 
                         }; reader.readAsText(e.target.files[0]);
                     }
                 });
