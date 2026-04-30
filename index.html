@@ -41,22 +41,33 @@
         .table-container::-webkit-scrollbar-thumb:hover { background: #FF6B00; }
 
         @media print {
-            body { background: white !important; overflow: visible !important; height: auto !important; display: block !important; }
-            aside, header .no-print, .no-print, #upload-prompt, #orientation-warning { display: none !important; }
-            main { display: block !important; overflow: visible !important; }
-            .section-card { box-shadow: none !important; border: 1px solid #ccc !important; page-break-inside: avoid; margin-bottom: 20px; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            body, html { background: white !important; overflow: visible !important; height: auto !important; display: block !important; }
+            #command-center-ui { display: flex !important; height: auto !important; overflow: visible !important; }
+            main { display: block !important; overflow: visible !important; height: auto !important; }
+            #main-content-area { overflow: visible !important; height: auto !important; display: block !important; }
+            aside, header .no-print, .no-print, #upload-prompt, #orientation-warning, #tracker-mode-ui { display: none !important; }
+            .section-card { box-shadow: none !important; border: 1px solid #ccc !important; break-inside: avoid; page-break-inside: avoid; margin-bottom: 20px; }
             #sci201-content { display: block !important; }
-            #canvas-container { height: 400px !important; border: 1px solid #000; page-break-inside: avoid; }
+            
+            /* Configuración de impresión para Mapas y Lienzos */
+            #canvas-container, #leaflet-container { height: 500px !important; border: 2px solid #333 !important; break-inside: avoid; page-break-inside: avoid; margin-bottom: 20px; }
+            .group { border: none !important; }
+            canvas { max-width: 100% !important; }
+            
             .table-container, #grupos-container { max-height: none !important; overflow: visible !important; }
-            textarea { height: auto !important; overflow: visible !important; resize: none; border: none !important; background: transparent !important; }
-            input, select { border: none !important; background: transparent !important; appearance: none; }
-            .obj-status { border: 1px solid #ddd !important; background: white !important; }
-            input[type="checkbox"] { display: none; } 
-            .no-page-break { page-break-inside: avoid; }
+            textarea { height: auto !important; overflow: visible !important; resize: none; border: 1px solid #eee !important; background: transparent !important; }
+            input, select { border: 1px solid #eee !important; background: transparent !important; appearance: none; padding: 2px !important; }
+            .obj-status { border: 1px solid #ddd !important; background: white !important; color: black !important; }
+            input[type="checkbox"] { display: inline-block !important; } 
+            
+            .no-page-break { break-inside: avoid; page-break-inside: avoid; }
         }
 
         #orientation-warning { display: none; }
-        @media (max-width: 800px) and (orientation: portrait) {
+        
+        /* ¡CLAVE! Se añade "screen and" para que la regla de giro SOLO aplique a pantallas y NO a la hoja de impresión */
+        @media screen and (max-width: 800px) and (orientation: portrait) {
             #command-center-ui { display: none !important; }
             #orientation-warning { display: flex !important; }
         }
@@ -478,7 +489,8 @@
 
             let db, auth, appId;
             try {
-                const firebaseConfig = (CUSTOM_FIREBASE_CONFIG && Object.keys(CUSTOM_FIREBASE_CONFIG).length > 0) ? CUSTOM_FIREBASE_CONFIG : (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null);
+                const hasCustomConfig = CUSTOM_FIREBASE_CONFIG && Object.keys(CUSTOM_FIREBASE_CONFIG).length > 0;
+                const firebaseConfig = hasCustomConfig ? CUSTOM_FIREBASE_CONFIG : (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null);
                 appId = typeof __app_id !== 'undefined' ? escapeHTML(__app_id) : 'dcc-tactico-local';
 
                 if (firebaseConfig && Object.keys(firebaseConfig).length > 0) {
@@ -486,7 +498,7 @@
                     auth = getAuth(app); db = getFirestore(app);
                     
                     try {
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { await signInWithCustomToken(auth, __initial_auth_token); } 
+                        if (!hasCustomConfig && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { await signInWithCustomToken(auth, __initial_auth_token); } 
                         else { await signInAnonymously(auth); }
                     } catch (authErr) {
                         console.error("Fallo Auth:", authErr);
