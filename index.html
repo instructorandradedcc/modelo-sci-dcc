@@ -81,7 +81,10 @@
             <img src="https://www.defensacivil.gov.co/_templates/DEFCIVIL-PORTAL-2020/recursos/images/cabezote/Logo-Defensoria-Civil.png" alt="Logo DCC" class="h-16 w-auto object-contain">
         </div>
         <h1 class="text-2xl font-bold mb-2 text-center">Unidad de Rastreo Operativo</h1>
-        <p class="text-gray-300 mb-8 text-center text-sm" id="tracker-volunteer-name">Identificando...</p>
+        <p class="text-gray-300 mb-2 text-center text-sm" id="tracker-volunteer-name">Identificando...</p>
+        
+        <!-- Indicador de señal y precisión GPS -->
+        <p class="text-xs text-orange-200 mb-8 font-mono bg-black/20 px-3 py-1 rounded-full" id="gps-accuracy-info">Esperando señal GPS...</p>
         
         <div class="bg-white/10 p-8 rounded-full mb-8 gps-active-ring transition-all duration-300" id="gps-status-ring">
             <svg class="w-20 h-20 text-dcc-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
@@ -112,7 +115,7 @@
                 </div>
                 <div class="flex items-center gap-1 md:gap-3 text-[10px] md:text-sm no-print">
                     <button id="btn-import-json" class="bg-white/20 hover:bg-white/30 text-white py-1 px-2 rounded flex items-center gap-1 border border-white/30" title="Cargar archivo">📂 <span class="hidden md:inline">Cargar</span></button>
-                    <!-- Corrección: Entradas ocultas separadas para funcionalidades distintas -->
+                    <!-- Entradas ocultas separadas para funcionalidades distintas -->
                     <input type="file" id="import-file-input" accept=".json" class="hidden">
                     <input type="file" id="map-upload-input" accept="image/*" class="hidden">
                     
@@ -345,6 +348,7 @@
                         <div id="mapid" class="absolute top-0 left-0 w-full h-full z-10"></div>
                         <div class="absolute bottom-4 left-4 z-[400] bg-white p-2 rounded shadow text-xs border border-dcc-orange max-w-[200px]">
                             <h4 class="font-bold text-dcc-blue mb-1 text-[10px] md:text-xs">Unidades Conectadas</h4>
+                            <p id="map-connection-status" class="text-[9px] text-red-500 font-bold mb-1 hidden">⚠️ Servidor Desconectado</p>
                             <ul id="live-users-list" class="text-gray-600 max-h-24 overflow-y-auto pl-3 list-disc text-[9px] md:text-xs">
                                 <li class="text-gray-400 italic">Esperando GPS...</li>
                             </ul>
@@ -451,6 +455,11 @@
             <p class="text-sm text-gray-600 mb-4">Grabe este enlace en una etiqueta NFC. Al escanearla, el voluntario transmitirá su ubicación GPS al Puesto de Comando.</p>
             <label class="block text-sm font-bold text-gray-700 mb-1">Indicativo de la Unidad:</label>
             <input type="text" id="nfc-vol-name" class="w-full p-2 border border-gray-300 rounded mb-4 focus:border-dcc-orange outline-none" placeholder="Ej. Escuadra Alfa">
+            
+            <div class="bg-blue-50 border-l-4 border-dcc-blue p-2 mb-4 text-xs text-dcc-blue">
+                <strong>Nota:</strong> Para que funcione el rastreo en terreno real con otros celulares, usted debe <b>alojar este archivo HTML en la web</b> (ej. GitHub Pages) y configurar sus credenciales de Firebase en el código fuente.
+            </div>
+
             <textarea id="nfc-url-output" class="w-full p-2 bg-gray-100 border border-gray-300 rounded text-xs text-gray-500 mb-4" rows="3" readonly></textarea>
             <div class="flex justify-end gap-2">
                 <button id="btn-close-nfc" class="px-4 py-2 bg-gray-200 text-gray-800 hover:bg-gray-300 rounded font-bold transition">Cerrar</button>
@@ -468,6 +477,19 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // =========================================================================================
+        // 🚨 CONFIGURACIÓN DE SERVIDOR GPS (FIREBASE) - INSTRUCCIONES PARA EL INGENIERO 🚨
+        // =========================================================================================
+        // Para usar esta plataforma en la vida real (con múltiples celulares en terreno):
+        // 1. Cree un proyecto gratuito en console.firebase.google.com
+        // 2. Active "Firestore Database" (modo de prueba).
+        // 3. Reemplace 'null' por el objeto de configuración que Firebase le entrega.
+        // Ejemplo: const CUSTOM_FIREBASE_CONFIG = { apiKey: "AIza...", projectId: "mi-proyecto", ... };
+        
+        const CUSTOM_FIREBASE_CONFIG = null; 
+        
+        // =========================================================================================
+
         document.addEventListener('DOMContentLoaded', async () => {
             
             // --- MODO RASTREADOR (NFC) ---
@@ -484,7 +506,8 @@
             // --- FIREBASE (GPS Real) ---
             let db, auth, appId;
             try {
-                const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+                // Toma la configuración personalizada si existe, sino usa la de prueba local del entorno de desarrollo.
+                const firebaseConfig = CUSTOM_FIREBASE_CONFIG || (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null);
                 appId = typeof __app_id !== 'undefined' ? __app_id : 'dcc-tactico-local';
 
                 if (firebaseConfig && Object.keys(firebaseConfig).length > 0) {
@@ -493,32 +516,51 @@
                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { await signInWithCustomToken(auth, __initial_auth_token); } 
                     else { await signInAnonymously(auth); }
                     onAuthStateChanged(auth, (user) => { if(user && !isTrackerMode) initCommandCenterGPS(); });
+                } else {
+                    document.getElementById('map-connection-status').classList.remove('hidden');
                 }
-            } catch(err) { console.warn("GPS remoto inactivo.", err); }
+            } catch(err) { 
+                console.warn("GPS remoto inactivo.", err); 
+                document.getElementById('map-connection-status').classList.remove('hidden');
+            }
 
             let watchId = null;
             const toggleTrackBtn = document.getElementById('toggle-tracking-btn');
             const ring = document.getElementById('gps-status-ring');
+            const accuracyInfo = document.getElementById('gps-accuracy-info');
 
             if(isTrackerMode && toggleTrackBtn) {
                 toggleTrackBtn.addEventListener('click', () => {
                     if(!watchId) {
                         if ("geolocation" in navigator) {
-                            toggleTrackBtn.innerText = "Detener Transmisión";
-                            toggleTrackBtn.classList.replace('bg-dcc-orange', 'bg-red-600');
-                            ring.classList.add('text-green-400'); ring.classList.remove('text-dcc-orange');
-
+                            toggleTrackBtn.innerText = "Solicitando permiso GPS...";
+                            
                             watchId = navigator.geolocation.watchPosition(async (position) => {
+                                // Éxito al leer GPS
+                                toggleTrackBtn.innerText = "Detener Transmisión";
+                                toggleTrackBtn.classList.replace('bg-dcc-orange', 'bg-red-600');
+                                ring.classList.add('text-green-400'); ring.classList.remove('text-dcc-orange');
+                                accuracyInfo.innerText = `Precisión GPS: ±${Math.round(position.coords.accuracy)} metros`;
+                                accuracyInfo.classList.replace('text-orange-200', 'text-green-200');
+
                                 if(!db || !auth.currentUser) return;
                                 const locData = { name: volunteerName, lat: position.coords.latitude, lng: position.coords.longitude, timestamp: Date.now() };
-                                try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'locations', auth.currentUser.uid), locData); } catch (e) {}
-                            }, (err) => { alert("Error GPS: " + err.message); }, { enableHighAccuracy: true, maximumAge: 0 });
-                        } else { alert("Navegador no soporta GPS."); }
+                                try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'locations', auth.currentUser.uid), locData); } catch (e) { console.error("Error BD:", e); }
+                            }, (err) => { 
+                                // Manejo de errores de GPS (Ej. Usuario denegó permisos)
+                                alert(err.code === 1 ? "⚠️ Debe 'Permitir' el acceso a la ubicación en su navegador web para transmitir." : "Error GPS: " + err.message);
+                                toggleTrackBtn.innerText = "Reintentar Transmisión GPS";
+                                toggleTrackBtn.classList.replace('bg-red-600', 'bg-dcc-orange');
+                                navigator.geolocation.clearWatch(watchId); watchId = null;
+                            }, { enableHighAccuracy: true, maximumAge: 0 });
+                        } else { alert("Su navegador no soporta tecnología GPS."); }
                     } else {
                         navigator.geolocation.clearWatch(watchId); watchId = null;
                         toggleTrackBtn.innerText = "Iniciar Transmisión GPS";
                         toggleTrackBtn.classList.replace('bg-red-600', 'bg-dcc-orange');
                         ring.classList.remove('text-green-400'); ring.classList.add('text-dcc-orange');
+                        accuracyInfo.innerText = "Transmisión detenida.";
+                        accuracyInfo.classList.replace('text-green-200', 'text-orange-200');
                     }
                 });
             }
@@ -578,6 +620,7 @@
                 if ("geolocation" in navigator) navigator.geolocation.getCurrentPosition(pos => mymap.setView([pos.coords.latitude, pos.coords.longitude], 14));
             }
             function initCommandCenterGPS() {
+                document.getElementById('map-connection-status').classList.add('hidden');
                 onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'locations'), (snapshot) => {
                     document.getElementById('live-users-list').innerHTML = '';
                     snapshot.forEach((doc) => {
@@ -743,7 +786,14 @@
 
             // NFC Modal
             document.getElementById('btn-generate-nfc').addEventListener('click', () => { document.getElementById('nfc-modal').classList.remove('hidden'); });
-            document.getElementById('nfc-vol-name').addEventListener('input', () => { document.getElementById('nfc-url-output').value = `${window.location.href.split('?')[0]}?tracker=true&name=${encodeURIComponent(document.getElementById('nfc-vol-name').value)}`; });
+            
+            // Modificación crucial: La URL debe apuntar al dominio donde se aloje el proyecto.
+            document.getElementById('nfc-vol-name').addEventListener('input', () => { 
+                // Aseguramos de que limpia cualquier parámetro anterior de la URL de alojamiento
+                const baseUrl = window.location.href.split('?')[0];
+                document.getElementById('nfc-url-output').value = `${baseUrl}?tracker=true&name=${encodeURIComponent(document.getElementById('nfc-vol-name').value)}`; 
+            });
+            
             document.getElementById('btn-close-nfc').addEventListener('click', () => document.getElementById('nfc-modal').classList.add('hidden'));
             document.getElementById('btn-copy-nfc').addEventListener('click', () => { document.getElementById('nfc-url-output').select(); document.execCommand('copy'); alert("URL copiada."); });
 
