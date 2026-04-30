@@ -112,8 +112,10 @@
                 </div>
                 <div class="flex items-center gap-1 md:gap-3 text-[10px] md:text-sm no-print">
                     <button id="btn-import-json" class="bg-white/20 hover:bg-white/30 text-white py-1 px-2 rounded flex items-center gap-1 border border-white/30" title="Cargar archivo">📂 <span class="hidden md:inline">Cargar</span></button>
-                    <!-- Input unificado para mapas, evidencias y JSON -->
-                    <input type="file" id="global-file-input" class="hidden">
+                    <!-- Corrección: Entradas ocultas separadas para funcionalidades distintas -->
+                    <input type="file" id="import-file-input" accept=".json" class="hidden">
+                    <input type="file" id="map-upload-input" accept="image/*" class="hidden">
+                    
                     <button id="btn-export-json" class="bg-white/20 hover:bg-white/30 text-white py-1 px-2 rounded flex items-center gap-1 border border-white/30" title="Guardar archivo local">💾 <span class="hidden md:inline">Guardar</span></button>
                     <button onclick="window.print()" class="bg-dcc-blue hover:bg-blue-900 text-white font-bold py-1 px-2 md:px-4 rounded shadow flex items-center gap-1">🖨️ <span class="hidden md:inline">Imprimir / PDF</span></button>
                 </div>
@@ -599,12 +601,25 @@
             const mapCtx = mapCanvas.getContext('2d'); const gridCtx = gridCanvas.getContext('2d'); const objectsCtx = objectsCanvas.getContext('2d'); const drawingCtx = drawingCanvas.getContext('2d');
             let isDrawing = false, isDragging = false, draggedItem = null, selectedObject = null, placedObjects = [], clickToPlaceMode = false, pendingDrop = null, volCount = 1;
             const toolState = { currentTool: 'pen', color: '#FF6B00', size: 3 };
+            
+            // CORRECCIÓN PERSISTENCIA: Guardar imagen actual para no perderla en redimensiones
+            let currentMapImage = null;
 
             function resizeCanvases() {
                 const rect = document.getElementById('canvas-container').getBoundingClientRect(); if(rect.width===0) return; 
                 [mapCanvas, gridCanvas, objectsCanvas, drawingCanvas].forEach(c => { c.width = rect.width; c.height = rect.height; });
                 gridCtx.strokeStyle = 'rgba(200, 200, 200, 0.3)'; for (let x=0; x<=gridCanvas.width; x+=30) { gridCtx.moveTo(x,0); gridCtx.lineTo(x,gridCanvas.height); } for (let y=0; y<=gridCanvas.height; y+=30) { gridCtx.moveTo(0,y); gridCtx.lineTo(gridCanvas.width,y); } gridCtx.stroke();
                 drawObjects();
+                drawMapBackground(); // Volver a dibujar el plano si existe
+            }
+
+            // Dibuja el fondo respetando las proporciones
+            function drawMapBackground() {
+                mapCtx.clearRect(0,0, mapCanvas.width, mapCanvas.height);
+                if (currentMapImage) {
+                    const r = Math.min(mapCanvas.width/currentMapImage.width, mapCanvas.height/currentMapImage.height); 
+                    mapCtx.drawImage(currentMapImage, 0,0, currentMapImage.width, currentMapImage.height, (mapCanvas.width - currentMapImage.width*r)/2, (mapCanvas.height - currentMapImage.height*r)/2, currentMapImage.width*r, currentMapImage.height*r); 
+                }
             }
 
             function drawObjects() {
@@ -681,18 +696,17 @@
             document.getElementById('color-picker').addEventListener('input', e => toolState.color = e.target.value);
             document.getElementById('brush-size').addEventListener('input', e => toolState.size = e.target.value);
             document.getElementById('clear-drawings').addEventListener('click', () => drawingCtx.clearRect(0,0, drawingCanvas.width, drawingCanvas.height));
-            document.getElementById('clear-board').addEventListener('click', () => { if(confirm('Limpiar plano?')){ mapCtx.clearRect(0,0, mapCanvas.width, mapCanvas.height); drawingCtx.clearRect(0,0, drawingCanvas.width, drawingCanvas.height); placedObjects=[]; drawObjects(); }});
+            document.getElementById('clear-board').addEventListener('click', () => { if(confirm('¿Limpiar plano?')){ currentMapImage = null; mapCtx.clearRect(0,0, mapCanvas.width, mapCanvas.height); drawingCtx.clearRect(0,0, drawingCanvas.width, drawingCanvas.height); placedObjects=[]; drawObjects(); }});
             
-            // Función para renderizar imagen en el canvas
+            // CORRECCIÓN PRINCIPAL: Función para renderizar imagen en el canvas adecuadamente vinculada
             const loadMapImage = (file) => {
                 if(file && file.type.startsWith('image/')) { 
                     const r = new FileReader(); 
                     r.onload = ev => { 
                         const i = new Image(); 
                         i.onload = () => { 
-                            mapCtx.clearRect(0,0,mapCanvas.width,mapCanvas.height); 
-                            const r = Math.min(mapCanvas.width/i.width, mapCanvas.height/i.height); 
-                            mapCtx.drawImage(i, 0,0, i.width, i.height, (mapCanvas.width - i.width*r)/2, (mapCanvas.height - i.height*r)/2, i.width*r, i.height*r); 
+                            currentMapImage = i;
+                            drawMapBackground();
                         }; 
                         i.src = ev.target.result; 
                     }; 
@@ -700,11 +714,16 @@
                 }
             };
             
-            // Botones de cargar mapa (Múltiples)
+            // Vinculación corregida de los inputs ocultos
             const mapInput = document.getElementById('map-upload-input');
-            mapInput.addEventListener('change', (e) => loadMapImage(e.target.files[0]));
-            document.getElementById('map-upload-btn').addEventListener('click', () => mapInput.click());
-            document.getElementById('quick-map-upload-btn').addEventListener('click', () => mapInput.click());
+            if(mapInput) {
+                mapInput.addEventListener('change', (e) => {
+                    loadMapImage(e.target.files[0]);
+                    e.target.value = ''; // Resetear para permitir cargar el mismo archivo varias veces
+                });
+                const quickBtn = document.getElementById('quick-map-upload-btn');
+                if(quickBtn) quickBtn.addEventListener('click', () => mapInput.click());
+            }
 
             // Pegar Imagen en el Tablero (Paste Event)
             document.addEventListener('paste', (e) => {
@@ -905,32 +924,46 @@
                 const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(incidentData)], {type: 'application/json'})); a.download = `Incidente_${incidentData.forms.nombre || 'DCC'}.json`; a.click();
             });
 
-            document.getElementById('btn-import-json').addEventListener('click', () => document.getElementById('import-file-input').click());
-            document.getElementById('import-file-input').addEventListener('change', (e) => {
-                if(e.target.files[0]) {
-                    const reader = new FileReader();
-                    reader.onload = (ev) => {
-                        try {
-                            const data = JSON.parse(ev.target.result);
-                            document.getElementById('incidente-seccional').value = data.forms.seccional || ''; document.getElementById('incidente-junta').value = data.forms.junta || ''; document.getElementById('incidente-nombre').value = data.forms.nombre || ''; document.getElementById('incidente-responsable').value = data.forms.resp || ''; document.getElementById('incidente-inicio').value = data.forms.inicio || ''; document.getElementById('incidente-fin').value = data.forms.fin || '';
-                            if(data.forms.staff) { document.getElementById('staff-comandante').value = data.forms.staff.comandante || ''; const setRole = (idChk, idInput, obj) => { if(obj){ const chk = document.getElementById(idChk); chk.checked = obj.active; document.getElementById(idInput).value = obj.value; window.toggleRoleInput(chk); } }; setRole('chk-seguridad', 'staff-seguridad', data.forms.staff.seguridad); setRole('chk-informacion', 'staff-informacion', data.forms.staff.informacion); setRole('chk-enlace', 'staff-enlace', data.forms.staff.enlace); }
-                            if(data.forms.secciones) { const setRole = (idChk, idInput, obj) => { if(obj){ const chk = document.getElementById(idChk); chk.checked = obj.active; document.getElementById(idInput).value = obj.value; window.toggleRoleInput(chk); } }; setRole('chk-operaciones', 'sec-operaciones', data.forms.secciones.operaciones); setRole('chk-planificacion', 'sec-planificacion', data.forms.secciones.planificacion); setRole('chk-logistica', 'sec-logistica', data.forms.secciones.logistica); setRole('chk-admin', 'sec-admin', data.forms.secciones.admin); }
-                            document.getElementById('objetivos-container').innerHTML = ''; if(data.forms.objetivos && data.forms.objetivos.length > 0) data.forms.objetivos.forEach(o => addObjective(o)); else addObjective();
-                            document.getElementById('grupos-container').innerHTML = ''; if(data.forms.grupos && data.forms.grupos.length > 0) data.forms.grupos.forEach(g => addGroup(g)); else addGroup();
-                            document.getElementById('sci207-body').innerHTML = ''; data.table207.forEach(r => addPatientRow(r));
-                            document.getElementById('sci211-body').innerHTML = ''; data.table211.forEach(r => addLogEntry(r));
-                            
-                            // Cargar Evidencias
-                            evidencesList = data.evidences || [];
-                            renderEvidences();
+            // CORRECCIÓN: Vinculación del botón de carga de JSON
+            const btnImportJson = document.getElementById('btn-import-json');
+            const importFileInput = document.getElementById('import-file-input');
+            if (btnImportJson && importFileInput) {
+                btnImportJson.addEventListener('click', () => importFileInput.click());
+                importFileInput.addEventListener('change', (e) => {
+                    if(e.target.files[0]) {
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                            try {
+                                const data = JSON.parse(ev.target.result);
+                                document.getElementById('incidente-seccional').value = data.forms.seccional || ''; document.getElementById('incidente-junta').value = data.forms.junta || ''; document.getElementById('incidente-nombre').value = data.forms.nombre || ''; document.getElementById('incidente-responsable').value = data.forms.resp || ''; document.getElementById('incidente-inicio').value = data.forms.inicio || ''; document.getElementById('incidente-fin').value = data.forms.fin || '';
+                                if(data.forms.staff) { document.getElementById('staff-comandante').value = data.forms.staff.comandante || ''; const setRole = (idChk, idInput, obj) => { if(obj){ const chk = document.getElementById(idChk); chk.checked = obj.active; document.getElementById(idInput).value = obj.value; window.toggleRoleInput(chk); } }; setRole('chk-seguridad', 'staff-seguridad', data.forms.staff.seguridad); setRole('chk-informacion', 'staff-informacion', data.forms.staff.informacion); setRole('chk-enlace', 'staff-enlace', data.forms.staff.enlace); }
+                                if(data.forms.secciones) { const setRole = (idChk, idInput, obj) => { if(obj){ const chk = document.getElementById(idChk); chk.checked = obj.active; document.getElementById(idInput).value = obj.value; window.toggleRoleInput(chk); } }; setRole('chk-operaciones', 'sec-operaciones', data.forms.secciones.operaciones); setRole('chk-planificacion', 'sec-planificacion', data.forms.secciones.planificacion); setRole('chk-logistica', 'sec-logistica', data.forms.secciones.logistica); setRole('chk-admin', 'sec-admin', data.forms.secciones.admin); }
+                                document.getElementById('objetivos-container').innerHTML = ''; if(data.forms.objetivos && data.forms.objetivos.length > 0) data.forms.objetivos.forEach(o => addObjective(o)); else addObjective();
+                                document.getElementById('grupos-container').innerHTML = ''; if(data.forms.grupos && data.forms.grupos.length > 0) data.forms.grupos.forEach(g => addGroup(g)); else addGroup();
+                                document.getElementById('sci207-body').innerHTML = ''; data.table207.forEach(r => addPatientRow(r));
+                                document.getElementById('sci211-body').innerHTML = ''; data.table211.forEach(r => addLogEntry(r));
+                                
+                                // Cargar Evidencias
+                                evidencesList = data.evidences || [];
+                                renderEvidences();
 
-                            placedObjects = data.canvas.objects || []; drawObjects();
-                            const bgImg = new Image(); bgImg.onload = () => mapCtx.drawImage(bgImg, 0,0); bgImg.src = data.canvas.bgUrl;
-                            const drawImg = new Image(); drawImg.onload = () => drawingCtx.drawImage(drawImg, 0,0); drawImg.src = data.canvas.drawingUrl;
-                        } catch(err) { alert("Error cargando archivo."); }
-                    }; reader.readAsText(e.target.files[0]);
-                }
-            });
+                                placedObjects = data.canvas.objects || []; drawObjects();
+                                
+                                // CORRECCIÓN: Cargar y persisir el fondo al importar un JSON
+                                const bgImg = new Image(); 
+                                bgImg.onload = () => {
+                                    currentMapImage = bgImg; // Se asigna a memoria
+                                    drawMapBackground(); // Se dibuja adaptándose a la pantalla
+                                }; 
+                                bgImg.src = data.canvas.bgUrl;
+
+                                const drawImg = new Image(); drawImg.onload = () => drawingCtx.drawImage(drawImg, 0,0); drawImg.src = data.canvas.drawingUrl;
+                            } catch(err) { alert("Error cargando archivo. Asegúrate de que es un respaldo válido del SCI."); }
+                            e.target.value = ''; // Resetear campo
+                        }; reader.readAsText(e.target.files[0]);
+                    }
+                });
+            }
         });
     </script>
 </body>
