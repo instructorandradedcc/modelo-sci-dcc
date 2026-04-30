@@ -587,6 +587,12 @@
                         accuracyInfo.classList.replace('text-green-200', 'text-orange-200');
                     }
                 });
+
+                // AUTO-INICIO: Simular clic en el botón al abrir la página mediante NFC
+                // para que pida permisos de ubicación de inmediato al voluntario.
+                setTimeout(() => {
+                    if (!watchId) toggleTrackBtn.click();
+                }, 800);
             }
 
             if (isTrackerMode) return;
