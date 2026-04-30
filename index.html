@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Tablero Táctico y Georreferenciación - Defensa Civil Colombiana</title>
-    <!-- IMPLEMENTACIÓN DE SEGURIDAD: Meta tags básicos de seguridad para control de caché y compatibilidad -->
+    <!-- IMPLEMENTACIÓN DE SEGURIDAD -->
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     
     <script src="https://cdn.tailwindcss.com"></script>
@@ -45,7 +45,7 @@
             aside, header .no-print, .no-print, #upload-prompt, #orientation-warning { display: none !important; }
             main { display: block !important; overflow: visible !important; }
             .section-card { box-shadow: none !important; border: 1px solid #ccc !important; page-break-inside: avoid; margin-bottom: 20px; }
-            #sci201-content { display: block !important; } /* Siempre mostrar en impresión */
+            #sci201-content { display: block !important; }
             #canvas-container { height: 400px !important; border: 1px solid #000; page-break-inside: avoid; }
             .table-container, #grupos-container { max-height: none !important; overflow: visible !important; }
             textarea { height: auto !important; overflow: visible !important; resize: none; border: none !important; background: transparent !important; }
@@ -55,7 +55,6 @@
             .no-page-break { page-break-inside: avoid; }
         }
 
-        /* Bloqueo de pantalla en modo Vertical (Portrait) para celulares */
         #orientation-warning { display: none; }
         @media (max-width: 800px) and (orientation: portrait) {
             #command-center-ui { display: none !important; }
@@ -65,6 +64,9 @@
         @keyframes pulse-ring { 0% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(255, 107, 0, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 15px rgba(255, 107, 0, 0); } 100% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(255, 107, 0, 0); } }
         .gps-active-ring { animation: pulse-ring 2s infinite; }
         .toggle-checkbox:checked { background-color: #FF6B00; border-color: #FF6B00; }
+        
+        /* Modificación táctica: Botón gigante invisible para auto-inicio */
+        #giant-start-btn { position: absolute; inset: 0; z-index: 50; cursor: pointer; background: transparent; }
     </style>
 </head>
 <body class="antialiased h-screen flex flex-col overflow-hidden">
@@ -75,36 +77,60 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
         </svg>
         <h2 class="text-3xl font-bold mb-4">Gire su dispositivo</h2>
-        <p class="text-lg mb-6">Para acceder al Tablero Táctico y tener espacio visual para los mapas y recursos, coloque su celular en posición <b>horizontal</b>.</p>
+        <p class="text-lg mb-6">Para acceder al Tablero Táctico y tener espacio visual, coloque su celular en posición <b>horizontal</b>.</p>
     </div>
 
     <!-- PANTALLA MODO RASTREADOR (Para el voluntario en terreno vía NFC) -->
-    <div id="tracker-mode-ui" class="hidden fixed inset-0 z-[100] bg-dcc-blue flex flex-col items-center justify-center text-white p-6">
-        <div class="bg-white p-2 rounded-lg mb-6 shadow-lg">
-            <img src="https://www.defensacivil.gov.co/_templates/DEFCIVIL-PORTAL-2020/recursos/images/cabezote/Logo-Defensoria-Civil.png" alt="Logo DCC" class="h-16 w-auto object-contain">
+    <div id="tracker-mode-ui" class="hidden fixed inset-0 z-[100] bg-dcc-blue flex flex-col items-center justify-center text-white p-6 relative">
+        
+        <!-- El botón gigante invisible resuelve el problema de permisos de navegador -->
+        <button id="giant-start-btn" aria-label="Toque para iniciar"></button>
+
+        <div class="bg-white p-2 rounded-lg mb-4 shadow-lg z-10">
+            <img src="https://www.defensacivil.gov.co/_templates/DEFCIVIL-PORTAL-2020/recursos/images/cabezote/Logo-Defensoria-Civil.png" alt="Logo DCC" class="h-12 w-auto object-contain">
         </div>
-        <h1 class="text-2xl font-bold mb-2 text-center">Unidad de Rastreo Operativo</h1>
-        <p class="text-gray-300 mb-2 text-center text-sm" id="tracker-volunteer-name">Identificando...</p>
+        <h1 class="text-xl font-bold mb-1 text-center z-10">Unidad de Rastreo Operativo</h1>
+        <p class="text-dcc-orange font-bold text-lg mb-2 text-center z-10" id="tracker-volunteer-name">Identificando...</p>
         
-        <!-- Indicador de señal y precisión GPS -->
-        <p class="text-xs text-orange-200 mb-8 font-mono bg-black/20 px-3 py-1 rounded-full" id="gps-accuracy-info">Esperando señal GPS...</p>
-        
-        <div class="bg-white/10 p-8 rounded-full mb-8 gps-active-ring transition-all duration-300" id="gps-status-ring">
-            <svg class="w-20 h-20 text-dcc-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+        <!-- Instrucción táctil inicial -->
+        <div id="tap-instruction" class="animate-pulse bg-white/20 text-white px-4 py-2 rounded-full font-bold mb-4 z-10 border border-white">
+            👆 TOQUE LA PANTALLA PARA ACTIVAR GPS
         </div>
 
-        <button id="toggle-tracking-btn" class="bg-dcc-orange hover:bg-orange-600 text-white font-bold py-4 px-8 rounded-full shadow-lg text-lg w-full max-w-xs transition">
-            Iniciar Transmisión GPS
-        </button>
+        <p class="text-xs text-orange-200 mb-4 font-mono bg-black/40 px-3 py-1 rounded-full z-10 hidden" id="gps-accuracy-info">Conectando con Satélites...</p>
+        
+        <div class="bg-white/10 p-6 rounded-full mb-2 transition-all duration-300 z-10" id="gps-status-ring">
+            <svg class="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+        </div>
+
+        <!-- PANEL OFFLINE DE SUPERVIVENCIA (Para Radio VHF/UHF) -->
+        <div id="offline-panel" class="w-full max-w-sm bg-black/50 border border-dcc-orange rounded-lg p-4 mt-2 z-20 flex flex-col items-center hidden">
+            <h3 class="text-xs font-bold text-orange-400 mb-1 uppercase tracking-widest">Coordenadas Exactas (Para Dictar por Radio)</h3>
+            <div class="bg-white text-black font-mono font-bold text-lg px-4 py-2 rounded w-full text-center tracking-wider" id="coord-display">
+                00.00000, -00.00000
+            </div>
+            
+            <p class="text-[10px] text-gray-400 mt-2 text-center" id="sync-status">📡 Sincronizando con PC Puesto de Mando...</p>
+            
+            <div class="flex gap-2 mt-3 w-full">
+                <button id="btn-copy-coords" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold py-2 px-2 rounded shadow">
+                    📋 Copiar
+                </button>
+                <a id="btn-wa-coords" href="#" target="_blank" class="flex-1 bg-green-600 hover:bg-green-500 text-white text-xs font-bold py-2 px-2 rounded shadow text-center flex items-center justify-center">
+                    💬 Enviar WhatsApp
+                </a>
+            </div>
+        </div>
+
     </div>
 
     <!-- PANTALLA PUESTO DE COMANDO (Principal) -->
     <div id="command-center-ui" class="flex flex-col h-full w-full">
         
-        <!-- Franja Azul (30% de la Naranja aprox) -->
+        <!-- Franja Azul -->
         <div class="h-2 md:h-3 w-full bg-dcc-blue flex-none"></div>
 
-        <!-- Header Institucional (Naranja) -->
+        <!-- Header Institucional -->
         <header class="bg-dcc-orange text-white shadow-md z-50 flex-none px-2 py-1 md:py-2">
             <div class="flex justify-between items-center gap-2">
                 <div class="flex items-center space-x-2 md:space-x-4">
@@ -118,24 +144,21 @@
                 </div>
                 <div class="flex items-center gap-1 md:gap-3 text-[10px] md:text-sm no-print">
                     <button id="btn-import-json" class="bg-white/20 hover:bg-white/30 text-white py-1 px-2 rounded flex items-center gap-1 border border-white/30" title="Cargar archivo">📂 <span class="hidden md:inline">Cargar</span></button>
-                    <!-- Entradas ocultas separadas para funcionalidades distintas -->
                     <input type="file" id="import-file-input" accept=".json" class="hidden">
                     <input type="file" id="map-upload-input" accept="image/*" class="hidden">
-                    
                     <button id="btn-export-json" class="bg-white/20 hover:bg-white/30 text-white py-1 px-2 rounded flex items-center gap-1 border border-white/30" title="Guardar archivo local">💾 <span class="hidden md:inline">Guardar</span></button>
                     <button onclick="window.print()" class="bg-dcc-blue hover:bg-blue-900 text-white font-bold py-1 px-2 md:px-4 rounded shadow flex items-center gap-1">🖨️ <span class="hidden md:inline">Imprimir / PDF</span></button>
                 </div>
             </div>
         </header>
 
-        <!-- AREA DE TRABAJO (Layout de dos columnas forzado) -->
+        <!-- AREA DE TRABAJO -->
         <main class="flex-1 flex flex-row overflow-hidden relative">
             
-            <!-- Sidebar: Biblioteca Operativa (Fija a la Izquierda) -->
+            <!-- Sidebar: Biblioteca Operativa -->
             <aside class="w-48 md:w-72 bg-white border-r border-gray-200 overflow-y-auto flex flex-col flex-none shadow-lg z-40">
                 <div class="p-2 md:p-4 flex-1">
                     <h3 class="text-xs md:text-sm font-bold text-dcc-blue uppercase mb-2 border-b-2 border-dcc-orange pb-1">Biblioteca Operativa</h3>
-                    
                     <p class="text-[9px] md:text-xs text-gray-500 mb-2 font-semibold no-print lg:hidden">👆 Toque un ícono y luego toque el mapa para ubicarlo.</p>
 
                     <div class="space-y-1.5 text-xs md:text-sm" id="resource-library">
@@ -152,7 +175,7 @@
                             <span class="font-bold text-dcc-blue leading-tight">Voluntario / Unidad</span>
                         </div>
                         <div class="resource-item flex items-center bg-gray-50 hover:bg-dcc-light p-1.5 md:p-2 rounded border border-gray-200" draggable="true" data-type="PC" data-label="PC">
-                            <span class="text-base md:text-xl mr-2 w-6 md:w-8 text-center text-dcc-blue font-bold">★</span> <span class="font-semibold">Puesto de Comando</span>
+                            <span class="text-base md:text-xl mr-2 w-6 md:w-8 text-center text-dcc-blue font-bold">★</span> <span class="font-semibold">Puesto Comando</span>
                         </div>
                         <div class="resource-item flex items-center bg-gray-50 hover:bg-dcc-light p-1.5 md:p-2 rounded border border-gray-200" draggable="true" data-type="Base" data-label="B">
                             <span class="text-base md:text-xl mr-2 w-6 md:w-8 text-center text-dcc-blue font-bold">⚑</span> <span class="font-semibold">Base Operativa</span>
@@ -201,10 +224,10 @@
                 </div>
             </aside>
 
-            <!-- Contenido Principal Derecha (Tablero y Formularios Desplegables) -->
+            <!-- Contenido Principal Derecha -->
             <section class="flex-1 overflow-y-auto p-2 md:p-4 flex flex-col gap-3 md:gap-4 bg-gray-100" id="main-content-area">
                 
-                <!-- Datos del Incidente (SCI 201 Expandido Modular PLEGABLE) -->
+                <!-- Datos del Incidente (SCI 201) -->
                 <div class="section-card relative py-2 px-3 md:p-6">
                     <div class="flex justify-between items-center border-b-2 border-dcc-orange pb-2">
                         <h2 class="text-sm md:text-lg font-bold text-dcc-blue">Organización del Incidente (SCI 201)</h2>
@@ -216,29 +239,15 @@
                         </div>
                     </div>
 
-                    <!-- CONTENEDOR PLEGABLE -->
                     <div id="sci201-content" class="hidden lg:block mt-3 md:mt-4">
-                        
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4 text-sm mb-4 bg-orange-50/50 p-2 md:p-3 rounded border border-orange-100">
-                            <div>
-                                <label class="block text-xs md:text-sm font-bold text-dcc-blue mb-1">Seccional (Grupo)</label>
-                                <input type="text" id="incidente-seccional" class="w-full p-1.5 md:p-2 border border-gray-300 rounded focus:ring-dcc-orange outline-none text-xs md:text-sm">
-                            </div>
-                            <div>
-                                <label class="block text-xs md:text-sm font-bold text-dcc-blue mb-1">Junta o Comité</label>
-                                <input type="text" id="incidente-junta" class="w-full p-1.5 md:p-2 border border-gray-300 rounded focus:ring-dcc-orange outline-none text-xs md:text-sm">
-                            </div>
+                            <div><label class="block text-xs md:text-sm font-bold text-dcc-blue mb-1">Seccional (Grupo)</label><input type="text" id="incidente-seccional" class="w-full p-1.5 md:p-2 border border-gray-300 rounded focus:ring-dcc-orange outline-none text-xs md:text-sm"></div>
+                            <div><label class="block text-xs md:text-sm font-bold text-dcc-blue mb-1">Junta o Comité</label><input type="text" id="incidente-junta" class="w-full p-1.5 md:p-2 border border-gray-300 rounded focus:ring-dcc-orange outline-none text-xs md:text-sm"></div>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-4 gap-2 md:gap-4 text-xs md:text-sm mb-4">
-                            <div class="md:col-span-2">
-                                <label class="block font-bold text-gray-700 mb-1">Nombre del Incidente</label>
-                                <input type="text" id="incidente-nombre" class="w-full p-1.5 md:p-2 border border-gray-300 rounded focus:ring-dcc-orange outline-none">
-                            </div>
-                            <div class="md:col-span-2">
-                                <label class="block font-bold text-dcc-blue mb-1">Elaborado por (Responsable)</label>
-                                <input type="text" id="incidente-responsable" class="w-full p-1.5 md:p-2 border border-dcc-orange bg-orange-50 rounded font-semibold outline-none">
-                            </div>
+                            <div class="md:col-span-2"><label class="block font-bold text-gray-700 mb-1">Nombre del Incidente</label><input type="text" id="incidente-nombre" class="w-full p-1.5 md:p-2 border border-gray-300 rounded focus:ring-dcc-orange outline-none"></div>
+                            <div class="md:col-span-2"><label class="block font-bold text-dcc-blue mb-1">Elaborado por (Responsable)</label><input type="text" id="incidente-responsable" class="w-full p-1.5 md:p-2 border border-dcc-orange bg-orange-50 rounded font-semibold outline-none"></div>
                             <div class="md:col-span-2 grid grid-cols-2 gap-2">
                                 <div><label class="block font-bold text-gray-700 mb-1">Inicio Periodo</label><input type="datetime-local" id="incidente-inicio" class="w-full p-1.5 border border-gray-300 rounded outline-none text-[10px] md:text-sm"></div>
                                 <div><label class="block font-bold text-gray-700 mb-1">Fin Periodo</label><input type="datetime-local" id="incidente-fin" class="w-full p-1.5 border border-gray-300 rounded outline-none text-[10px] md:text-sm"></div>
@@ -253,26 +262,10 @@
                                     <span class="text-[10px] text-gray-500 font-bold no-print">Aplica</span>
                                 </div>
                                 <div class="grid grid-cols-1 gap-2 text-[10px] md:text-xs" id="staff-inputs">
-                                    <div class="flex items-center gap-1 md:gap-2">
-                                        <input type="checkbox" checked disabled class="w-3 h-3 md:w-4 md:h-4 accent-dcc-orange opacity-50">
-                                        <span class="w-1/3 font-bold text-dcc-blue">Comandante: *</span>
-                                        <input type="text" id="staff-comandante" class="w-2/3 p-1 md:p-1.5 border border-gray-300 rounded outline-none bg-white">
-                                    </div>
-                                    <div class="flex items-center gap-1 md:gap-2">
-                                        <input type="checkbox" id="chk-seguridad" checked class="w-3 h-3 md:w-4 md:h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)">
-                                        <span class="w-1/3 font-semibold text-gray-700">Seguridad:</span>
-                                        <input type="text" id="staff-seguridad" class="w-2/3 p-1 md:p-1.5 border border-gray-300 rounded outline-none bg-white">
-                                    </div>
-                                    <div class="flex items-center gap-1 md:gap-2">
-                                        <input type="checkbox" id="chk-informacion" checked class="w-3 h-3 md:w-4 md:h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)">
-                                        <span class="w-1/3 font-semibold text-gray-700">Información:</span>
-                                        <input type="text" id="staff-informacion" class="w-2/3 p-1 md:p-1.5 border border-gray-300 rounded outline-none bg-white">
-                                    </div>
-                                    <div class="flex items-center gap-1 md:gap-2">
-                                        <input type="checkbox" id="chk-enlace" checked class="w-3 h-3 md:w-4 md:h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)">
-                                        <span class="w-1/3 font-semibold text-gray-700">Enlace:</span>
-                                        <input type="text" id="staff-enlace" class="w-2/3 p-1 md:p-1.5 border border-gray-300 rounded outline-none bg-white">
-                                    </div>
+                                    <div class="flex items-center gap-1 md:gap-2"><input type="checkbox" checked disabled class="w-3 h-3 md:w-4 md:h-4 accent-dcc-orange opacity-50"><span class="w-1/3 font-bold text-dcc-blue">Comandante: *</span><input type="text" id="staff-comandante" class="w-2/3 p-1 md:p-1.5 border border-gray-300 rounded outline-none bg-white"></div>
+                                    <div class="flex items-center gap-1 md:gap-2"><input type="checkbox" id="chk-seguridad" checked class="w-3 h-3 md:w-4 md:h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)"><span class="w-1/3 font-semibold text-gray-700">Seguridad:</span><input type="text" id="staff-seguridad" class="w-2/3 p-1 md:p-1.5 border border-gray-300 rounded outline-none bg-white"></div>
+                                    <div class="flex items-center gap-1 md:gap-2"><input type="checkbox" id="chk-informacion" checked class="w-3 h-3 md:w-4 md:h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)"><span class="w-1/3 font-semibold text-gray-700">Información:</span><input type="text" id="staff-informacion" class="w-2/3 p-1 md:p-1.5 border border-gray-300 rounded outline-none bg-white"></div>
+                                    <div class="flex items-center gap-1 md:gap-2"><input type="checkbox" id="chk-enlace" checked class="w-3 h-3 md:w-4 md:h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)"><span class="w-1/3 font-semibold text-gray-700">Enlace:</span><input type="text" id="staff-enlace" class="w-2/3 p-1 md:p-1.5 border border-gray-300 rounded outline-none bg-white"></div>
                                 </div>
                             </div>
 
@@ -283,26 +276,10 @@
                                     <span class="text-[10px] text-gray-500 font-bold no-print">Aplica</span>
                                 </div>
                                 <div class="grid grid-cols-1 gap-2 text-[10px] md:text-xs" id="secciones-inputs">
-                                    <div class="flex items-center gap-1 md:gap-2">
-                                        <input type="checkbox" id="chk-operaciones" checked class="w-3 h-3 md:w-4 md:h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)">
-                                        <span class="w-1/3 font-semibold text-gray-700">Operaciones:</span>
-                                        <input type="text" id="sec-operaciones" class="w-2/3 p-1 md:p-1.5 border border-gray-300 rounded outline-none bg-white">
-                                    </div>
-                                    <div class="flex items-center gap-1 md:gap-2">
-                                        <input type="checkbox" id="chk-planificacion" checked class="w-3 h-3 md:w-4 md:h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)">
-                                        <span class="w-1/3 font-semibold text-gray-700">Planificación:</span>
-                                        <input type="text" id="sec-planificacion" class="w-2/3 p-1 md:p-1.5 border border-gray-300 rounded outline-none bg-white">
-                                    </div>
-                                    <div class="flex items-center gap-1 md:gap-2">
-                                        <input type="checkbox" id="chk-logistica" checked class="w-3 h-3 md:w-4 md:h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)">
-                                        <span class="w-1/3 font-semibold text-gray-700">Logística:</span>
-                                        <input type="text" id="sec-logistica" class="w-2/3 p-1 md:p-1.5 border border-gray-300 rounded outline-none bg-white">
-                                    </div>
-                                    <div class="flex items-center gap-1 md:gap-2">
-                                        <input type="checkbox" id="chk-admin" checked class="w-3 h-3 md:w-4 md:h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)">
-                                        <span class="w-1/3 font-semibold text-gray-700">Admin/Finanz:</span>
-                                        <input type="text" id="sec-admin" class="w-2/3 p-1 md:p-1.5 border border-gray-300 rounded outline-none bg-white">
-                                    </div>
+                                    <div class="flex items-center gap-1 md:gap-2"><input type="checkbox" id="chk-operaciones" checked class="w-3 h-3 md:w-4 md:h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)"><span class="w-1/3 font-semibold text-gray-700">Operaciones:</span><input type="text" id="sec-operaciones" class="w-2/3 p-1 md:p-1.5 border border-gray-300 rounded outline-none bg-white"></div>
+                                    <div class="flex items-center gap-1 md:gap-2"><input type="checkbox" id="chk-planificacion" checked class="w-3 h-3 md:w-4 md:h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)"><span class="w-1/3 font-semibold text-gray-700">Planificación:</span><input type="text" id="sec-planificacion" class="w-2/3 p-1 md:p-1.5 border border-gray-300 rounded outline-none bg-white"></div>
+                                    <div class="flex items-center gap-1 md:gap-2"><input type="checkbox" id="chk-logistica" checked class="w-3 h-3 md:w-4 md:h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)"><span class="w-1/3 font-semibold text-gray-700">Logística:</span><input type="text" id="sec-logistica" class="w-2/3 p-1 md:p-1.5 border border-gray-300 rounded outline-none bg-white"></div>
+                                    <div class="flex items-center gap-1 md:gap-2"><input type="checkbox" id="chk-admin" checked class="w-3 h-3 md:w-4 md:h-4 toggle-checkbox accent-dcc-orange no-print" onchange="toggleRoleInput(this)"><span class="w-1/3 font-semibold text-gray-700">Admin/Finanz:</span><input type="text" id="sec-admin" class="w-2/3 p-1 md:p-1.5 border border-gray-300 rounded outline-none bg-white"></div>
                                 </div>
                             </div>
                         </div>
@@ -331,7 +308,6 @@
                                 🌍 Mapa GPS <span class="bg-red-500 text-white text-[8px] px-1 rounded-full animate-pulse shadow">En vivo</span>
                             </button>
                         </div>
-                        <!-- NUEVO BOTÓN: Cargar Plano directo en el mapa -->
                         <button id="quick-map-upload-btn" class="bg-dcc-orange hover:bg-orange-600 text-white px-2 md:px-3 py-1.5 md:py-2 m-1 md:m-1.5 rounded text-[10px] md:text-xs font-bold shadow flex items-center gap-1 transition">
                             📷 Cargar Plano (Fondo)
                         </button>
@@ -410,11 +386,10 @@
                     </div>
                 </div>
 
-                <!-- NUEVO: Módulo de Registro Fotográfico y Evidencias -->
+                <!-- Módulo de Registro Fotográfico -->
                 <div class="section-card py-2 px-3 md:p-6 mb-8">
                     <div class="flex justify-between items-center mb-2 md:mb-4 border-b-2 border-dcc-blue pb-2">
                         <h2 class="text-sm md:text-lg font-bold text-dcc-blue">Registro Fotográfico y Evidencias</h2>
-                        <!-- Botón para tomar foto (usará cámara en celular) -->
                         <button id="btn-take-photo" onclick="document.getElementById('evidence-upload').click()" class="bg-dcc-orange hover:bg-orange-600 text-white px-3 py-1.5 md:py-2 rounded text-[10px] md:text-xs font-bold shadow-sm flex items-center gap-1 transition no-print">
                             📸 Tomar / Subir Foto
                         </button>
@@ -430,20 +405,13 @@
     </div>
 
     <!-- Modales -->
-    
-    <!-- Modal para Selección de Voluntario al arrastrar/tocar -->
     <div id="volunteer-modal" class="hidden fixed inset-0 z-[250] bg-black/60 flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm border-t-4 border-dcc-orange">
             <h3 class="text-lg font-bold text-dcc-blue mb-2">Asignar Unidad a Ubicación</h3>
             <p class="text-xs text-gray-600 mb-4">Seleccione el voluntario del listado operativo o ingrese uno nuevo.</p>
-            
             <label class="block text-xs font-bold text-gray-700 mb-1">Voluntario / Grupo:</label>
-            <select id="vol-modal-select" class="w-full p-2 border border-gray-300 rounded mb-2 text-sm outline-none focus:border-dcc-orange">
-                <!-- Opciones cargadas dinámicamente -->
-            </select>
-            
+            <select id="vol-modal-select" class="w-full p-2 border border-gray-300 rounded mb-2 text-sm outline-none focus:border-dcc-orange"></select>
             <input type="text" id="vol-modal-custom-input" class="hidden w-full p-2 border border-gray-300 rounded mb-4 text-sm outline-none focus:border-dcc-orange" placeholder="Escriba el nombre o indicativo...">
-            
             <div class="flex justify-end gap-2 mt-4">
                 <button id="btn-cancel-vol" class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded text-sm font-bold transition">Cancelar</button>
                 <button id="btn-confirm-vol" class="px-3 py-1.5 bg-dcc-orange hover:bg-orange-600 text-white rounded text-sm font-bold shadow transition">Ubicar en Mapa</button>
@@ -451,18 +419,15 @@
         </div>
     </div>
 
-    <!-- Modal NFC -->
     <div id="nfc-modal" class="hidden fixed inset-0 z-[200] bg-black/60 flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md border-t-4 border-dcc-blue">
             <h3 class="text-xl font-bold text-dcc-blue mb-4">Generar Enlace para Tag NFC</h3>
             <p class="text-sm text-gray-600 mb-4">Grabe este enlace en una etiqueta NFC. Al escanearla, el voluntario transmitirá su ubicación GPS al Puesto de Comando.</p>
             <label class="block text-sm font-bold text-gray-700 mb-1">Indicativo de la Unidad:</label>
             <input type="text" id="nfc-vol-name" class="w-full p-2 border border-gray-300 rounded mb-4 focus:border-dcc-orange outline-none" placeholder="Ej. Escuadra Alfa">
-            
             <div class="bg-blue-50 border-l-4 border-dcc-blue p-2 mb-4 text-xs text-dcc-blue">
-                <strong>Nota de Seguridad:</strong> El enlace generado cuenta con protección de codificación, pero asegúrese de grabar los Tags NFC con permisos de <b>solo lectura</b> para que terceros no alteren el enlace en el terreno.
+                <strong>Nota de Seguridad:</strong> El enlace generado cuenta con protección de codificación, pero asegúrese de grabar los Tags NFC con permisos de <b>solo lectura</b>.
             </div>
-
             <textarea id="nfc-url-output" class="w-full p-2 bg-gray-100 border border-gray-300 rounded text-xs text-gray-500 mb-4" rows="3" readonly></textarea>
             <div class="flex justify-end gap-2">
                 <button id="btn-close-nfc" class="px-4 py-2 bg-gray-200 text-gray-800 hover:bg-gray-300 rounded font-bold transition">Cerrar</button>
@@ -471,21 +436,13 @@
         </div>
     </div>
 
-    <!-- Input Oculto para Evidencias -->
     <input type="file" id="evidence-upload" accept="image/*" capture="environment" class="hidden no-print">
 
-    <!-- Scripts (Firebase, Lógica y Tácticas Adaptativas) -->
+    <!-- Scripts -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // =========================================================================================
-        // 🚨 CONFIGURACIÓN DE SERVIDOR GPS (FIREBASE) - INSTRUCCIONES DE CIBERSEGURIDAD 🚨
-        // =========================================================================================
-        // A continuación, reemplace el contenido de CUSTOM_FIREBASE_CONFIG con sus credenciales reales
-        // obtenidas desde la consola de Firebase.
-        // =========================================================================================
         
         const CUSTOM_FIREBASE_CONFIG = {
             apiKey: "AIzaSyDlkkQdkBgD_1ZBvnLuTz0UGvixMNF5CAU",
@@ -497,107 +454,128 @@
             measurementId: "G-8EDJHN6XS9"
         }; 
         
-        // =========================================================================================
-        
-        // MOTOR DE DESINFECCIÓN ANTI-XSS (Cross-Site Scripting)
-        // Convierte caracteres peligrosos en entidades HTML inofensivas.
         const escapeHTML = (str) => {
             if (str === null || str === undefined) return '';
-            return String(str).replace(/[&<>'"]/g, 
-                tag => ({
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    "'": '&#39;',
-                    '"': '&quot;'
-                }[tag] || tag)
-            );
+            return String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',"'": '&#39;','"': '&quot;'}[tag] || tag));
         };
 
         document.addEventListener('DOMContentLoaded', async () => {
             
-            // --- MODO RASTREADOR (NFC) ---
             const urlParams = new URLSearchParams(window.location.search);
-            const isTrackerMode = escapeHTML(urlParams.get('tracker')) === 'true'; // Sanitizado preventivamente
-            const volunteerName = escapeHTML(urlParams.get('name')) || 'Voluntario Anónimo'; // Sanitizado preventivamente
+            const isTrackerMode = escapeHTML(urlParams.get('tracker')) === 'true';
+            const volunteerName = escapeHTML(urlParams.get('name')) || 'Voluntario Anónimo';
 
             if (isTrackerMode) {
                 document.getElementById('tracker-mode-ui').classList.remove('hidden');
                 document.getElementById('command-center-ui').classList.add('hidden');
-                document.getElementById('tracker-volunteer-name').innerText = `Unidad: ${volunteerName}`; // innerText es seguro por defecto, pero sanitizar antes es mejor práctica
+                document.getElementById('tracker-volunteer-name').innerText = `Unidad: ${volunteerName}`;
             }
 
-            // --- FIREBASE (GPS Real) ---
+            function showConnError(msg) {
+                const el = document.getElementById('map-connection-status');
+                if(el) { el.classList.remove('hidden'); el.innerText = msg; }
+            }
+
             let db, auth, appId;
             try {
-                // Toma la configuración personalizada si existe, sino usa la de prueba local del entorno de desarrollo.
                 const firebaseConfig = (CUSTOM_FIREBASE_CONFIG && Object.keys(CUSTOM_FIREBASE_CONFIG).length > 0) ? CUSTOM_FIREBASE_CONFIG : (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null);
                 appId = typeof __app_id !== 'undefined' ? escapeHTML(__app_id) : 'dcc-tactico-local';
 
                 if (firebaseConfig && Object.keys(firebaseConfig).length > 0) {
                     const app = initializeApp(firebaseConfig);
                     auth = getAuth(app); db = getFirestore(app);
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { await signInWithCustomToken(auth, __initial_auth_token); } 
-                    else { await signInAnonymously(auth); }
+                    
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { await signInWithCustomToken(auth, __initial_auth_token); } 
+                        else { await signInAnonymously(auth); }
+                    } catch (authErr) {
+                        console.error("Fallo Auth:", authErr);
+                        showConnError("⚠️ Error Auth: Active 'Anónimo' en Firebase y autorice github.io");
+                    }
+
                     onAuthStateChanged(auth, (user) => { if(user && !isTrackerMode) initCommandCenterGPS(); });
                 } else {
-                    document.getElementById('map-connection-status').classList.remove('hidden');
+                    showConnError("⚠️ Servidor Firebase No Configurado");
                 }
             } catch(err) { 
-                console.warn("GPS remoto inactivo.", err); 
-                document.getElementById('map-connection-status').classList.remove('hidden');
+                console.error("Error inicial:", err);
+                showConnError("⚠️ Error al iniciar servidor: " + escapeHTML(err.message));
             }
 
             let watchId = null;
-            const toggleTrackBtn = document.getElementById('toggle-tracking-btn');
+            const giantBtn = document.getElementById('giant-start-btn');
             const ring = document.getElementById('gps-status-ring');
             const accuracyInfo = document.getElementById('gps-accuracy-info');
+            const tapInstruction = document.getElementById('tap-instruction');
+            const offlinePanel = document.getElementById('offline-panel');
+            const coordDisplay = document.getElementById('coord-display');
+            const syncStatus = document.getElementById('sync-status');
+            const btnCopyCoords = document.getElementById('btn-copy-coords');
+            const btnWaCoords = document.getElementById('btn-wa-coords');
 
-            if(isTrackerMode && toggleTrackBtn) {
-                toggleTrackBtn.addEventListener('click', () => {
+            if(isTrackerMode && giantBtn) {
+                const startTracking = () => {
                     if(!watchId) {
+                        giantBtn.style.display = 'none'; 
+                        tapInstruction.style.display = 'none'; 
+                        accuracyInfo.classList.remove('hidden');
+                        accuracyInfo.innerText = "Solicitando permiso GPS (Alta Precisión)...";
+                        
                         if ("geolocation" in navigator) {
-                            toggleTrackBtn.innerText = "Solicitando permiso GPS...";
-                            
                             watchId = navigator.geolocation.watchPosition(async (position) => {
-                                // Éxito al leer GPS
-                                toggleTrackBtn.innerText = "Detener Transmisión";
-                                toggleTrackBtn.classList.replace('bg-dcc-orange', 'bg-red-600');
-                                ring.classList.add('text-green-400'); ring.classList.remove('text-dcc-orange');
-                                accuracyInfo.innerText = `Precisión GPS: ±${Math.round(position.coords.accuracy)} metros`;
-                                accuracyInfo.classList.replace('text-orange-200', 'text-green-200');
+                                const lat = position.coords.latitude;
+                                const lng = position.coords.longitude;
+                                const acc = Math.round(position.coords.accuracy);
+                                
+                                ring.classList.add('text-green-400'); ring.classList.remove('text-white');
+                                accuracyInfo.innerText = `Precisión GPS: ±${acc} metros`;
+                                accuracyInfo.className = "text-xs mb-4 font-mono bg-black/40 px-3 py-1 rounded-full z-10 " + 
+                                    (acc < 15 ? 'text-green-300' : (acc < 50 ? 'text-yellow-300' : 'text-red-400'));
 
-                                if(!db || !auth.currentUser) return;
-                                const locData = { name: volunteerName, lat: position.coords.latitude, lng: position.coords.longitude, timestamp: Date.now() };
-                                try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'locations', auth.currentUser.uid), locData); } catch (e) { console.error("Error BD:", e); }
+                                offlinePanel.classList.remove('hidden');
+                                coordDisplay.innerText = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                                
+                                const waMsg = `*Emergencia / DCC*%0AUnidad: ${volunteerName}%0AUbicación: https://maps.google.com/?q=${lat},${lng}%0APrecisión: ±${acc}m`;
+                                btnWaCoords.href = `https://wa.me/?text=${waMsg}`;
+
+                                btnCopyCoords.onclick = () => {
+                                    navigator.clipboard.writeText(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+                                    btnCopyCoords.innerText = "✅ ¡Copiado!";
+                                    setTimeout(() => btnCopyCoords.innerText = "📋 Copiar", 2000);
+                                };
+
+                                if(!db || !auth?.currentUser) {
+                                    syncStatus.innerText = "❌ Sin conexión a Puesto de Mando (Use Radio o WhatsApp)";
+                                    syncStatus.classList.replace('text-gray-400', 'text-red-400');
+                                    return;
+                                }
+                                
+                                const locData = { name: volunteerName, lat: lat, lng: lng, timestamp: Date.now() };
+                                try { 
+                                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'locations', auth.currentUser.uid), locData); 
+                                    syncStatus.innerText = "✅ Transmitiendo en vivo al Puesto de Mando";
+                                    syncStatus.classList.replace('text-red-400', 'text-green-400');
+                                } catch (e) { 
+                                    console.error("Error BD:", e); 
+                                    syncStatus.innerText = "❌ Fallo envío al servidor (Revisar Reglas Firebase)";
+                                    syncStatus.classList.replace('text-green-400', 'text-red-400');
+                                }
                             }, (err) => { 
-                                // Manejo de errores de GPS (Ej. Usuario denegó permisos)
-                                alert(err.code === 1 ? "⚠️ Debe 'Permitir' el acceso a la ubicación en su navegador web para transmitir." : "Error GPS: " + escapeHTML(err.message));
-                                toggleTrackBtn.innerText = "Reintentar Transmisión GPS";
-                                toggleTrackBtn.classList.replace('bg-red-600', 'bg-dcc-orange');
+                                alert(err.code === 1 ? "⚠️ Debe 'Permitir' el acceso a la ubicación en su celular." : "Error GPS: " + escapeHTML(err.message));
+                                giantBtn.style.display = 'block'; 
+                                tapInstruction.style.display = 'block';
+                                tapInstruction.innerText = "REINTENTAR GPS";
                                 navigator.geolocation.clearWatch(watchId); watchId = null;
-                            }, { enableHighAccuracy: true, maximumAge: 0 });
+                            }, { enableHighAccuracy: true, maximumAge: 0, timeout: 27000 });
                         } else { alert("Su navegador no soporta tecnología GPS."); }
-                    } else {
-                        navigator.geolocation.clearWatch(watchId); watchId = null;
-                        toggleTrackBtn.innerText = "Iniciar Transmisión GPS";
-                        toggleTrackBtn.classList.replace('bg-red-600', 'bg-dcc-orange');
-                        ring.classList.remove('text-green-400'); ring.classList.add('text-dcc-orange');
-                        accuracyInfo.innerText = "Transmisión detenida.";
-                        accuracyInfo.classList.replace('text-green-200', 'text-orange-200');
                     }
-                });
+                };
 
-                // AUTO-INICIO: Simular clic en el botón al abrir la página mediante NFC
-                // para que pida permisos de ubicación de inmediato al voluntario.
-                setTimeout(() => {
-                    if (!watchId) toggleTrackBtn.click();
-                }, 800);
+                giantBtn.addEventListener('click', startTracking);
             }
 
             if (isTrackerMode) return;
 
-            // --- FUNCIONES MODULARES ---
             window.getAvailableVolunteers = () => [...new Set(Array.from(document.querySelectorAll('.member-badge-text')).map(b => b.innerText.trim()))];
             window.toggleRoleInput = (chk) => {
                 const inp = chk.parentElement.querySelector('input[type="text"]');
@@ -605,7 +583,6 @@
                 else { inp.disabled = true; inp.classList.replace('bg-white','bg-gray-200'); inp.value='N/A'; }
             };
 
-            // --- OBJETIVOS (SCI 202) --- SEGURIDAD: Se aplica escapeHTML a los valores que se inyectan en el DOM
             window.updateObjectiveTime = (sel) => {
                 sel.closest('.objective-item').querySelector('.obj-time').innerText = new Date().toTimeString().substring(0,5); 
                 sel.className = "obj-status w-full p-1.5 border rounded text-[10px] md:text-sm outline-none font-bold transition-colors " + 
@@ -632,7 +609,6 @@
                 document.getElementById('objetivos-container').appendChild(div);
             };
 
-            // --- GRUPOS --- SEGURIDAD: Sanitizar nombres de grupos y miembros importados
             window.addGroup = (data = null) => {
                 const div = document.createElement('div'); div.className = "bg-white p-2 rounded border border-gray-200 group-item relative text-xs mb-2 shadow-sm";
                 let memHTML = ''; 
@@ -643,8 +619,6 @@
                 }
                 const safeName = data ? escapeHTML(data.name) : '';
                 
-                // NOTA: Se cambió la función inline del onkeydown para usar un validador (escapeHTML básico aplicado en el proceso de inyección, 
-                // aunque el manual DOM textContent es preferible, se escapa por seguridad)
                 div.innerHTML = `
                     <button onclick="this.parentElement.remove()" class="absolute top-1 right-1 text-red-500 font-bold no-print text-base leading-none">&times;</button>
                     <div class="flex gap-1 mb-1 pr-4"><select class="grp-type p-1 border border-gray-300 rounded outline-none bg-gray-50 w-1/3 font-semibold text-dcc-blue text-[10px] md:text-xs"><option value="Grupo">Grupo</option><option value="Fuerza Tarea">Fuerza Tarea</option><option value="Equipo">Eq. Intervención</option></select><input type="text" class="grp-name w-2/3 p-1 border border-gray-300 rounded outline-none text-[10px] md:text-xs" placeholder="Indicativo (Ej. Alfa 1)" value="${safeName}"></div>
@@ -656,35 +630,72 @@
 
             addObjective(); addGroup();
 
-            // --- LEAFLET MAP ---
             let mymap; let volunteerMarkers = {};
+            let isMapCentered = false; // Bandera para centrado automático
+            
             function initLeafletMap() {
-                if(mymap) return; mymap = L.map('mapid').setView([4.6097, -74.0817], 6); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mymap);
-                if ("geolocation" in navigator) navigator.geolocation.getCurrentPosition(pos => mymap.setView([pos.coords.latitude, pos.coords.longitude], 14));
+                if(mymap) { mymap.invalidateSize(); return; }
+                mymap = L.map('mapid').setView([4.6097, -74.0817], 6); 
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mymap);
+                // No pedir GPS en el PC por defecto si ya está centrado
             }
+            
             function initCommandCenterGPS() {
                 document.getElementById('map-connection-status').classList.add('hidden');
-                onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'locations'), (snapshot) => {
+                
+                onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'locations'), 
+                (snapshot) => {
+                    document.getElementById('map-connection-status').classList.add('hidden'); 
                     document.getElementById('live-users-list').innerHTML = '';
+                    
                     snapshot.forEach((doc) => {
-                        const data = doc.data(); if (Date.now() - data.timestamp > 3600000) return; 
+                        const data = doc.data(); 
+                        if (Date.now() - data.timestamp > 3600000) return; // Oculta si lleva > 1 hora inactivo
                         
-                        const safeUserName = escapeHTML(data.name); // SEGURIDAD: Filtrado contra XSS desde un cliente falso de DB
-                        document.getElementById('live-users-list').innerHTML += `<li class="text-green-600 font-semibold">${safeUserName}</li>`;
+                        const safeUserName = escapeHTML(data.name); 
+                        document.getElementById('live-users-list').innerHTML += `<li class="text-green-600 font-semibold cursor-pointer hover:text-green-800" onclick="window.focusMapTo('${doc.id}')" title="Centrar mapa">📍 ${safeUserName}</li>`;
+                        
                         if(mymap) {
                             const latlng = [data.lat, data.lng];
-                            if(volunteerMarkers[doc.id]) { volunteerMarkers[doc.id].setLatLng(latlng); } 
-                            else { volunteerMarkers[doc.id] = L.marker(latlng, {icon: L.divIcon({ className: 'bg-transparent', html: `<div class="flex flex-col items-center"><svg viewBox="0 0 24 24" width="30" height="30" style="filter:drop-shadow(0 2px 2px rgba(0,0,0,0.5))"><path d="M4 11C4 6.58 7.58 3 12 3C16.42 3 20 6.58 20 11" fill="#FF6B00"/><path d="M2 11H22" stroke="#FF6B00" stroke-width="2.5"/><rect x="9" y="12" width="6" height="3" fill="#FFCC99" rx="1"/><path d="M5 16v8h14v-8c0-1-4-2-7-2s-7 1-7 2z" fill="#FF6B00"/><rect x="5" y="18" width="14" height="2.5" fill="#002855"/></svg><span class="bg-white text-[8px] px-1 rounded shadow font-bold text-black mt-0.5">${safeUserName}</span></div>`, iconSize: [30, 40], iconAnchor: [15, 20] })}).addTo(mymap); }
+                            if(volunteerMarkers[doc.id]) { 
+                                volunteerMarkers[doc.id].setLatLng(latlng); 
+                            } else { 
+                                volunteerMarkers[doc.id] = L.marker(latlng, {
+                                    icon: L.divIcon({ 
+                                        className: 'bg-transparent', 
+                                        html: `<div class="flex flex-col items-center"><svg viewBox="0 0 24 24" width="35" height="35" style="filter:drop-shadow(0 2px 2px rgba(0,0,0,0.5))"><path d="M4 11C4 6.58 7.58 3 12 3C16.42 3 20 6.58 20 11" fill="#FF6B00"/><path d="M2 11H22" stroke="#FF6B00" stroke-width="2.5"/><rect x="9" y="12" width="6" height="3" fill="#FFCC99" rx="1"/><path d="M5 16v8h14v-8c0-1-4-2-7-2s-7 1-7 2z" fill="#FF6B00"/><rect x="5" y="18" width="14" height="2.5" fill="#002855"/></svg><span class="bg-white text-[9px] px-1.5 py-0.5 rounded shadow-lg font-bold text-dcc-blue mt-0.5 whitespace-nowrap border border-dcc-orange">${safeUserName}</span></div>`, 
+                                        iconSize: [40, 50], iconAnchor: [20, 25] 
+                                    })
+                                }).addTo(mymap); 
+                                
+                                // ¡AUTO ENFOQUE! Centrar el mapa en el primer voluntario que se conecta
+                                if(!isMapCentered) {
+                                    mymap.setView(latlng, 17); // Zoom a nivel de calle (17)
+                                    isMapCentered = true;
+                                }
+                            }
                         }
                     });
-                    if(document.getElementById('live-users-list').innerHTML === '') document.getElementById('live-users-list').innerHTML = '<li class="text-gray-400 italic">Sin conexión</li>';
+                    if(document.getElementById('live-users-list').innerHTML === '') document.getElementById('live-users-list').innerHTML = '<li class="text-gray-400 italic">Sin conexión actual</li>';
+                }, 
+                (error) => {
+                    console.error("Error en escucha Firestore:", error);
+                    let errMsg = "⚠️ Error de Conexión GPS";
+                    if (error.code === 'permission-denied') errMsg = "⚠️ BD Bloqueada: Falta habilitar Auth Anónimo o autorizar dominio en Firebase";
+                    showConnError(errMsg);
                 });
             }
+            
+            // Función global para centrar el mapa al hacer clic en el nombre de la lista
+            window.focusMapTo = (id) => {
+                if(mymap && volunteerMarkers[id]) {
+                    mymap.flyTo(volunteerMarkers[id].getLatLng(), 18, { duration: 1 });
+                }
+            };
 
             document.getElementById('tab-canvas-btn').addEventListener('click', function() { this.classList.replace('text-gray-600','text-dcc-blue'); this.classList.replace('bg-transparent','bg-white'); this.classList.replace('border-transparent','border-dcc-orange'); document.getElementById('tab-map-btn').classList.replace('text-dcc-blue','text-gray-600'); document.getElementById('tab-map-btn').classList.replace('bg-white','bg-transparent'); document.getElementById('tab-map-btn').classList.replace('border-dcc-orange','border-transparent'); document.getElementById('canvas-container').classList.remove('hidden'); document.getElementById('leaflet-container').classList.add('hidden'); });
-            document.getElementById('tab-map-btn').addEventListener('click', function() { this.classList.replace('text-gray-600','text-dcc-blue'); this.classList.replace('bg-transparent','bg-white'); this.classList.replace('border-transparent','border-dcc-orange'); document.getElementById('tab-canvas-btn').classList.replace('text-dcc-blue','text-gray-600'); document.getElementById('tab-canvas-btn').classList.replace('bg-white','bg-transparent'); document.getElementById('tab-canvas-btn').classList.replace('border-dcc-orange','border-transparent'); document.getElementById('canvas-container').classList.add('hidden'); document.getElementById('leaflet-container').classList.remove('hidden'); initLeafletMap(); mymap.invalidateSize(); });
+            document.getElementById('tab-map-btn').addEventListener('click', function() { this.classList.replace('text-gray-600','text-dcc-blue'); this.classList.replace('bg-transparent','bg-white'); this.classList.replace('border-transparent','border-dcc-orange'); document.getElementById('tab-canvas-btn').classList.replace('text-dcc-blue','text-gray-600'); document.getElementById('tab-canvas-btn').classList.replace('bg-white','bg-transparent'); document.getElementById('tab-canvas-btn').classList.replace('border-dcc-orange','border-transparent'); document.getElementById('canvas-container').classList.add('hidden'); document.getElementById('leaflet-container').classList.remove('hidden'); initLeafletMap(); setTimeout(()=>mymap.invalidateSize(), 100); });
 
-            // --- CANVAS DRAWING & CLICK-TO-PLACE & PASTE ---
             const mapCanvas = document.getElementById('map-canvas'); const gridCanvas = document.getElementById('grid-canvas'); const objectsCanvas = document.getElementById('objects-canvas'); const drawingCanvas = document.getElementById('drawing-canvas');
             const mapCtx = mapCanvas.getContext('2d'); const gridCtx = gridCanvas.getContext('2d'); const objectsCtx = objectsCanvas.getContext('2d'); const drawingCtx = drawingCanvas.getContext('2d');
             let isDrawing = false, isDragging = false, draggedItem = null, selectedObject = null, placedObjects = [], clickToPlaceMode = false, pendingDrop = null, volCount = 1;
@@ -697,10 +708,9 @@
                 [mapCanvas, gridCanvas, objectsCanvas, drawingCanvas].forEach(c => { c.width = rect.width; c.height = rect.height; });
                 gridCtx.strokeStyle = 'rgba(200, 200, 200, 0.3)'; for (let x=0; x<=gridCanvas.width; x+=30) { gridCtx.moveTo(x,0); gridCtx.lineTo(x,gridCanvas.height); } for (let y=0; y<=gridCanvas.height; y+=30) { gridCtx.moveTo(0,y); gridCtx.lineTo(gridCanvas.width,y); } gridCtx.stroke();
                 drawObjects();
-                drawMapBackground(); // Volver a dibujar el plano si existe
+                drawMapBackground();
             }
 
-            // Dibuja el fondo respetando las proporciones
             function drawMapBackground() {
                 mapCtx.clearRect(0,0, mapCanvas.width, mapCanvas.height);
                 if (currentMapImage) {
@@ -712,7 +722,7 @@
             function drawObjects() {
                 objectsCtx.clearRect(0, 0, objectsCanvas.width, objectsCanvas.height);
                 placedObjects.forEach(obj => {
-                    const safeLabel = escapeHTML(obj.label); // SEGURIDAD
+                    const safeLabel = escapeHTML(obj.label);
                     if(obj.type === 'Voluntario') {
                         objectsCtx.font = '20px Arial'; objectsCtx.textAlign = 'center'; objectsCtx.textBaseline = 'middle'; objectsCtx.fillText('👷', obj.x, obj.y - 5);
                         objectsCtx.font = 'bold 9px Arial'; const w = objectsCtx.measureText(safeLabel).width; objectsCtx.fillStyle = 'rgba(255,255,255,0.8)'; objectsCtx.fillRect(obj.x - w/2 - 2, obj.y + 8, w + 4, 12); objectsCtx.fillStyle = '#FF6B00'; objectsCtx.fillText(safeLabel, obj.x, obj.y + 14);
@@ -769,7 +779,6 @@
 
             window.addEventListener('resize', resizeCanvases); setTimeout(resizeCanvases, 300);
 
-            // Modal Logic
             document.getElementById('vol-modal-select').addEventListener('change', e => { const c = document.getElementById('vol-modal-custom-input'); if(e.target.value === 'custom') c.classList.remove('hidden'); else c.classList.add('hidden'); });
             document.getElementById('btn-cancel-vol').addEventListener('click', () => document.getElementById('volunteer-modal').classList.add('hidden'));
             document.getElementById('btn-confirm-vol').addEventListener('click', () => {
@@ -778,7 +787,6 @@
                 placedObjects.push(pendingDrop); drawObjects(); document.getElementById('volunteer-modal').classList.add('hidden');
             });
 
-            // Herramientas Pizarra
             document.getElementById('pen-tool').addEventListener('click', function() { toolState.currentTool = 'pen'; this.classList.add('bg-dcc-blue', 'text-white'); document.getElementById('eraser-tool').classList.remove('bg-dcc-blue', 'text-white'); });
             document.getElementById('eraser-tool').addEventListener('click', function() { toolState.currentTool = 'eraser'; this.classList.add('bg-dcc-blue', 'text-white'); document.getElementById('pen-tool').classList.remove('bg-dcc-blue', 'text-white'); });
             document.getElementById('color-picker').addEventListener('input', e => toolState.color = e.target.value);
@@ -825,7 +833,6 @@
                 }
             });
 
-            // NFC Modal
             document.getElementById('btn-generate-nfc').addEventListener('click', () => { document.getElementById('nfc-modal').classList.remove('hidden'); });
             
             document.getElementById('nfc-vol-name').addEventListener('input', () => { 
@@ -836,7 +843,6 @@
             document.getElementById('btn-close-nfc').addEventListener('click', () => document.getElementById('nfc-modal').classList.add('hidden'));
             document.getElementById('btn-copy-nfc').addEventListener('click', () => { document.getElementById('nfc-url-output').select(); document.execCommand('copy'); alert("URL copiada."); });
 
-            // Tablas SCI - SEGURIDAD: Saneamiento de datos importados
             window.addPatientRow = (data = ['', '', '', 'verde', '']) => {
                 const tr = document.createElement('tr'); tr.className = "border-b hover:bg-red-50";
                 tr.innerHTML = `<td class="px-1 md:px-2 py-1"><input type="text" value="${escapeHTML(data[0])}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none" placeholder="Nombre"></td><td class="px-1 md:px-2 py-1"><input type="number" value="${escapeHTML(data[1])}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none" placeholder="Cédula"></td><td class="px-1 md:px-2 py-1"><input type="text" value="${escapeHTML(data[2])}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none" placeholder="Trauma..."></td><td class="px-1 md:px-2 py-1"><select class="w-full text-[10px] md:text-xs p-1 border rounded outline-none"><option value="verde" ${data[3]=='verde'?'selected':''}>🟢 Verde</option><option value="amarillo" ${data[3]=='amarillo'?'selected':''}>🟡 Amaril</option><option value="rojo" ${data[3]=='rojo'?'selected':''}>🔴 Rojo</option><option value="negro" ${data[3]=='negro'?'selected':''}>⚫ Negro</option></select></td><td class="px-1 md:px-2 py-1"><input type="text" value="${escapeHTML(data[4])}" class="w-full text-[10px] md:text-xs p-1 border rounded outline-none" placeholder="Destino"></td><td class="px-1 md:px-2 py-1 text-center no-print"><button onclick="this.closest('tr').remove()" class="text-red-500 font-bold">&times;</button></td>`;
@@ -849,7 +855,6 @@
             };
             addPatientRow(); addLogEntry();
 
-            // --- REGISTRO FOTOGRÁFICO Y EVIDENCIAS ---
             let evidencesList = [];
             const evidenceInput = document.getElementById('evidence-upload');
             const evidencesContainer = document.getElementById('evidences-container');
@@ -886,7 +891,6 @@
                                 canvas.height = height;
                                 ctx.drawImage(img, 0, 0, width, height);
 
-                                // --- CREAR MARCA DE AGUA (ESTAMPA FORENSE DCC) ---
                                 const barHeight = Math.max(height * 0.15, 60); 
                                 ctx.fillStyle = 'rgba(0, 40, 85, 0.85)'; 
                                 ctx.fillRect(0, height - barHeight, width, barHeight);
@@ -986,7 +990,6 @@
                 }
             }
 
-            // --- EXPORTAR / IMPORTAR SEGURIZADO ---
             document.getElementById('btn-export-json').addEventListener('click', () => {
                 const incidentData = {
                     forms: {
@@ -1015,8 +1018,6 @@
                             try {
                                 const data = JSON.parse(ev.target.result);
                                 
-                                // SEGURIDAD: En la importación, aunque lo mostremos en un 'value' que es seguro, 
-                                // las inyecciones HTML en el objeto persistirán si se exportan luego. Limitamos el daño.
                                 document.getElementById('incidente-seccional').value = data.forms.seccional || ''; 
                                 document.getElementById('incidente-junta').value = data.forms.junta || ''; 
                                 document.getElementById('incidente-nombre').value = data.forms.nombre || ''; 
