@@ -468,7 +468,7 @@
         const keyPartB = "PEGUE_AQUI_LA_SEGUNDA_MITAD_DE_LA_CLAVE"; 
 
         const CUSTOM_FIREBASE_CONFIG = {
-            apiKey: keyPartA + keyPartB,
+            apiKey: keyPartA + keyPartB, // Si prefiere no dividirla, simplemente borre esto y pegue su clave completa entre comillas: "AIzaSy..."
             authDomain: "dcc-tactico-sci.firebaseapp.com",
             projectId: "dcc-tactico-sci",
             storageBucket: "dcc-tactico-sci.firebasestorage.app",
@@ -502,8 +502,8 @@
 
             let db, auth, appId;
             try {
-                // Validación para detectar si el usuario ya llenó la clave o no
-                const hasValidKey = keyPartA !== "PEGUE_AQUI_LA_PRIMERA_MITAD_DE_LA_CLAVE" && keyPartB !== "PEGUE_AQUI_LA_SEGUNDA_MITAD_DE_LA_CLAVE";
+                // Validación robusta para detectar si la clave ya fue ingresada (completa o partida)
+                const hasValidKey = CUSTOM_FIREBASE_CONFIG && CUSTOM_FIREBASE_CONFIG.apiKey && !CUSTOM_FIREBASE_CONFIG.apiKey.includes("PEGUE_AQUI");
                 const firebaseConfig = hasValidKey ? CUSTOM_FIREBASE_CONFIG : (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null);
                 appId = typeof __app_id !== 'undefined' ? escapeHTML(__app_id) : 'dcc-tactico-local';
 
@@ -512,7 +512,7 @@
                     auth = getAuth(app); db = getFirestore(app);
                     
                     try {
-                        if (!hasValidKey && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { await signInWithCustomToken(auth, __initial_auth_token); } 
+                        if (hasValidKey && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { await signInWithCustomToken(auth, __initial_auth_token); } 
                         else { await signInAnonymously(auth); }
                     } catch (authErr) {
                         console.error("Fallo Auth Detallado:", authErr);
