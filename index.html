@@ -66,7 +66,6 @@
 
         #orientation-warning { display: none; }
         
-        /* ¡CLAVE! Se añade "screen and" para que la regla de giro SOLO aplique a pantallas y NO a la hoja de impresión */
         @media screen and (max-width: 800px) and (orientation: portrait) {
             #command-center-ui { display: none !important; }
             #orientation-warning { display: flex !important; }
@@ -76,7 +75,6 @@
         .gps-active-ring { animation: pulse-ring 2s infinite; }
         .toggle-checkbox:checked { background-color: #FF6B00; border-color: #FF6B00; }
         
-        /* Modificación táctica: Botón gigante invisible para auto-inicio */
         #giant-start-btn { position: absolute; inset: 0; z-index: 50; cursor: pointer; background: transparent; }
     </style>
 </head>
@@ -94,7 +92,6 @@
     <!-- PANTALLA MODO RASTREADOR (Para el voluntario en terreno vía NFC) -->
     <div id="tracker-mode-ui" class="hidden fixed inset-0 z-[100] bg-dcc-blue flex flex-col items-center justify-center text-white p-6 relative">
         
-        <!-- El botón gigante invisible resuelve el problema de permisos de navegador -->
         <button id="giant-start-btn" aria-label="Toque para iniciar"></button>
 
         <div class="bg-white p-2 rounded-lg mb-4 shadow-lg z-10">
@@ -103,7 +100,6 @@
         <h1 class="text-xl font-bold mb-1 text-center z-10">Unidad de Rastreo Operativo</h1>
         <p class="text-dcc-orange font-bold text-lg mb-2 text-center z-10" id="tracker-volunteer-name">Identificando...</p>
         
-        <!-- Instrucción táctil inicial -->
         <div id="tap-instruction" class="animate-pulse bg-white/20 text-white px-4 py-2 rounded-full font-bold mb-4 z-10 border border-white">
             👆 TOQUE LA PANTALLA PARA ACTIVAR GPS
         </div>
@@ -114,9 +110,12 @@
             <svg class="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
         </div>
 
-        <!-- PANEL OFFLINE DE SUPERVIVENCIA (Para Radio VHF/UHF) -->
+        <button id="btn-stop-gps" class="mt-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-full shadow-lg z-20 flex items-center gap-2 hidden transition-colors border-2 border-red-800">
+            🛑 Desconectar GPS y Salir
+        </button>
+
         <div id="offline-panel" class="w-full max-w-sm bg-black/50 border border-dcc-orange rounded-lg p-4 mt-2 z-20 flex flex-col items-center hidden">
-            <h3 class="text-xs font-bold text-orange-400 mb-1 uppercase tracking-widest">Coordenadas Exactas (Para Dictar por Radio)</h3>
+            <h3 class="text-xs font-bold text-orange-400 mb-1 uppercase tracking-widest">Coordenadas Exactas (Para Radio)</h3>
             <div class="bg-white text-black font-mono font-bold text-lg px-4 py-2 rounded w-full text-center tracking-wider" id="coord-display">
                 00.00000, -00.00000
             </div>
@@ -128,7 +127,7 @@
                     📋 Copiar
                 </button>
                 <a id="btn-wa-coords" href="#" target="_blank" class="flex-1 bg-green-600 hover:bg-green-500 text-white text-xs font-bold py-2 px-2 rounded shadow text-center flex items-center justify-center">
-                    💬 Enviar WhatsApp
+                    💬 WhatsApp
                 </a>
             </div>
         </div>
@@ -138,10 +137,8 @@
     <!-- PANTALLA PUESTO DE COMANDO (Principal) -->
     <div id="command-center-ui" class="flex flex-col h-full w-full">
         
-        <!-- Franja Azul -->
         <div class="h-2 md:h-3 w-full bg-dcc-blue flex-none"></div>
 
-        <!-- Header Institucional -->
         <header class="bg-dcc-orange text-white shadow-md z-50 flex-none px-2 py-1 md:py-2">
             <div class="flex justify-between items-center gap-2">
                 <div class="flex items-center space-x-2 md:space-x-4">
@@ -163,10 +160,8 @@
             </div>
         </header>
 
-        <!-- AREA DE TRABAJO -->
         <main class="flex-1 flex flex-row overflow-hidden relative">
             
-            <!-- Sidebar: Biblioteca Operativa -->
             <aside class="w-48 md:w-72 bg-white border-r border-gray-200 overflow-y-auto flex flex-col flex-none shadow-lg z-40">
                 <div class="p-2 md:p-4 flex-1">
                     <h3 class="text-xs md:text-sm font-bold text-dcc-blue uppercase mb-2 border-b-2 border-dcc-orange pb-1">Biblioteca Operativa</h3>
@@ -235,10 +230,8 @@
                 </div>
             </aside>
 
-            <!-- Contenido Principal Derecha -->
             <section class="flex-1 overflow-y-auto p-2 md:p-4 flex flex-col gap-3 md:gap-4 bg-gray-100" id="main-content-area">
                 
-                <!-- Datos del Incidente (SCI 201) -->
                 <div class="section-card relative py-2 px-3 md:p-6">
                     <div class="flex justify-between items-center border-b-2 border-dcc-orange pb-2">
                         <h2 class="text-sm md:text-lg font-bold text-dcc-blue">Organización del Incidente (SCI 201)</h2>
@@ -266,7 +259,6 @@
                         </div>
 
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
-                            <!-- Staff de Comando -->
                             <div class="bg-gray-50 p-2 md:p-3 rounded border border-gray-200 shadow-inner">
                                 <div class="flex justify-between items-center mb-2 border-b border-gray-300 pb-1">
                                     <label class="block text-sm font-bold text-gray-800">Staff de Comando</label>
@@ -280,7 +272,6 @@
                                 </div>
                             </div>
 
-                            <!-- Jefes de Sección -->
                             <div class="bg-gray-50 p-2 md:p-3 rounded border border-gray-200 shadow-inner">
                                 <div class="flex justify-between items-center mb-2 border-b border-gray-300 pb-1">
                                     <label class="block text-sm font-bold text-gray-800">Staff General (Secciones)</label>
@@ -295,23 +286,19 @@
                             </div>
                         </div>
 
-                        <!-- Grupos Dinámicos con Tags -->
                         <div class="bg-gray-50 p-2 rounded border border-gray-200 flex flex-col mt-3 md:mt-4">
                             <div class="flex justify-between items-center mb-2 border-b border-gray-300 pb-1">
                                 <label class="block text-sm font-bold text-gray-800">Recursos: Grupos y Fuerzas de Tarea</label>
                                 <button onclick="addGroup()" class="bg-dcc-blue text-white px-2 py-1 rounded text-[10px] font-bold no-print shadow hover:bg-blue-800">+ Añadir Grupo</button>
                             </div>
+                            <p class="text-[10px] text-dcc-orange font-bold italic mb-2">Solo los voluntarios creados aquí aparecerán en el mapa (Control estricto operativo).</p>
                             <div id="grupos-container" class="space-y-2 flex-1 max-h-40 overflow-y-auto pr-1">
-                                <!-- Elementos de grupo -->
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Tablero y Mapa Táctico -->
                 <div class="section-card flex-1 min-h-[350px] md:min-h-[500px] flex flex-col p-0 overflow-hidden border-2 border-gray-300 relative group">
-                    
-                    <!-- Barra superior del Mapa -->
                     <div class="bg-gray-200 flex justify-between items-center border-b border-gray-300 no-print">
                         <div class="flex">
                             <button id="tab-canvas-btn" class="px-3 md:px-6 py-2 md:py-3 font-bold text-[10px] md:text-sm text-dcc-blue bg-white border-t-4 border-dcc-orange text-center">✏️ Pizarra Local</button>
@@ -336,28 +323,25 @@
 
                     <div id="leaflet-container" class="relative w-full flex-1 hidden">
                         <div id="mapid" class="absolute top-0 left-0 w-full h-full z-10"></div>
-                        <div class="absolute bottom-4 left-4 z-[400] bg-white p-2 rounded shadow text-xs border border-dcc-orange max-w-[200px]">
-                            <h4 class="font-bold text-dcc-blue mb-1 text-[10px] md:text-xs">Unidades Conectadas</h4>
+                        <div class="absolute bottom-4 left-4 z-[400] bg-white p-2 rounded shadow text-xs border border-dcc-orange w-48 max-w-[200px] flex flex-col">
+                            <h4 class="font-bold text-dcc-blue mb-1 text-[10px] md:text-xs border-b border-gray-200 pb-1">Unidades Conectadas</h4>
                             <p id="map-connection-status" class="text-[9px] text-red-500 font-bold mb-1 hidden">⚠️ Servidor Desconectado</p>
-                            <ul id="live-users-list" class="text-gray-600 max-h-24 overflow-y-auto pl-3 list-disc text-[9px] md:text-xs">
-                                <li class="text-gray-400 italic">Esperando GPS...</li>
+                            <ul id="live-users-list" class="text-gray-600 max-h-32 overflow-y-auto list-none text-[9px] md:text-xs">
+                                <li class="text-gray-400 italic mt-1">Esperando GPS...</li>
                             </ul>
                         </div>
                     </div>
                 </div>
 
-                <!-- Objetivos y Tácticas (SCI 202) -->
                 <div class="section-card py-2 px-3 md:p-6">
                     <div class="flex justify-between items-center mb-3 border-b-2 border-dcc-orange pb-2">
                         <h2 class="text-sm md:text-lg font-bold text-dcc-blue">Plan de Acción: Objetivos (SCI 202)</h2>
                         <button onclick="addObjective()" class="bg-dcc-orange text-white px-2 py-1 md:px-3 md:py-1 rounded text-[10px] md:text-xs font-bold shadow no-print">+ Objetivo</button>
                     </div>
                     <div id="objetivos-container" class="space-y-3">
-                        <!-- Objetivos -->
                     </div>
                 </div>
 
-                <!-- Tablas 207 y 211 -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4 mb-4">
                     <div class="section-card py-2 px-3 md:p-6">
                         <div class="flex justify-between items-center mb-2 md:mb-4 border-b-2 border-red-500 pb-2">
@@ -397,7 +381,6 @@
                     </div>
                 </div>
 
-                <!-- Módulo de Registro Fotográfico -->
                 <div class="section-card py-2 px-3 md:p-6 mb-8">
                     <div class="flex justify-between items-center mb-2 md:mb-4 border-b-2 border-dcc-blue pb-2">
                         <h2 class="text-sm md:text-lg font-bold text-dcc-blue">Registro Fotográfico y Evidencias</h2>
@@ -406,7 +389,6 @@
                         </button>
                     </div>
                     <div id="evidences-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                        <!-- Evidencias dinámicas -->
                     </div>
                     <p id="no-evidences-msg" class="text-center text-xs text-gray-400 italic py-4">Aún no hay fotografías registradas.</p>
                 </div>
@@ -455,13 +437,9 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
-        // 🚨 INSTRUCCIONES ESTRICTAS PARA LA CLAVE API 🚨
-        // Para que GitHub NO bloquee su mapa, DEBE pegar la clave en dos pedazos.
-        // NUNCA pegue la clave completa en una sola línea.
-
-        // Ejemplo: Si su clave es "AIzaSy1234567890abcdefg", divídala así:
-        const PARTE_1 = "AIzaSyDlkkQdkBgD_1"; // Pegue la primera mitad aquí
-        const PARTE_2 = "ZBvnLuTzOUGvixMNF5CAU"; // Pegue la segunda mitad aquí
+        // 🚨 CONFIGURACIÓN FIREBASE - PEGAR CLAVES AQUÍ EN 2 PARTES PARA EVITAR BLOQUEOS GITHUB 🚨
+        const PARTE_1 = "AIzaSyDlkkQdkBgD_1"; 
+        const PARTE_2 = "ZBvnLuTzOUGvixMNF5CAU"; 
 
         const CUSTOM_FIREBASE_CONFIG = {
             apiKey: PARTE_1 + PARTE_2,
@@ -497,7 +475,6 @@
 
             let db, auth, appId;
             try {
-                // Verificación estricta: Revisa si el usuario configuró la clave o si debe usar el entorno de prueba interno.
                 const isRunningInCanvas = typeof __firebase_config !== 'undefined';
                 const hasValidKey = PARTE_1 !== "PEGUE_AQUI_PRIMERA_MITAD" && PARTE_2 !== "PEGUE_AQUI_SEGUNDA_MITAD";
                 
@@ -517,7 +494,7 @@
                     } catch (authErr) {
                         console.error("Fallo Auth Detallado:", authErr);
                         if (authErr.code === 'auth/api-key-not-valid') {
-                            showConnError("⚠️ LLAVE API BLOQUEADA: Google desactivó su llave por la alerta de GitHub. Genere una nueva y péguela en dos pedazos.");
+                            showConnError("⚠️ LLAVE API BLOQUEADA. Revise configuración.");
                         } else {
                             showConnError("⚠️ Error Auth: " + escapeHTML(authErr.message));
                         }
@@ -525,13 +502,14 @@
 
                     onAuthStateChanged(auth, (user) => { if(user && !isTrackerMode) initCommandCenterGPS(); });
                 } else {
-                    showConnError("⚠️ Servidor Firebase No Configurado (Pegue su clave API en PARTE_1 y PARTE_2)");
+                    showConnError("⚠️ Servidor Firebase No Configurado");
                 }
             } catch(err) { 
                 console.error("Error inicial:", err);
                 showConnError("⚠️ Error al iniciar servidor: " + escapeHTML(err.message));
             }
 
+            // GESTIÓN DEL TRACKER (Celular del voluntario)
             let watchId = null;
             const giantBtn = document.getElementById('giant-start-btn');
             const ring = document.getElementById('gps-status-ring');
@@ -542,6 +520,7 @@
             const syncStatus = document.getElementById('sync-status');
             const btnCopyCoords = document.getElementById('btn-copy-coords');
             const btnWaCoords = document.getElementById('btn-wa-coords');
+            const btnStopGps = document.getElementById('btn-stop-gps');
 
             if(isTrackerMode && giantBtn) {
                 const startTracking = () => {
@@ -549,6 +528,7 @@
                         giantBtn.style.display = 'none'; 
                         tapInstruction.style.display = 'none'; 
                         accuracyInfo.classList.remove('hidden');
+                        btnStopGps.classList.remove('hidden');
                         accuracyInfo.innerText = "Solicitando permiso GPS (Alta Precisión)...";
                         
                         if ("geolocation" in navigator) {
@@ -580,20 +560,22 @@
                                     return;
                                 }
                                 
-                                const locData = { name: volunteerName, lat: lat, lng: lng, timestamp: Date.now() };
+                                // FLAG ACTIVE: TRUE para saber que está reportando
+                                const locData = { name: volunteerName, lat: lat, lng: lng, timestamp: Date.now(), active: true };
                                 try { 
                                     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'locations', auth.currentUser.uid), locData); 
                                     syncStatus.innerText = "✅ Transmitiendo en vivo al Puesto de Mando";
                                     syncStatus.classList.replace('text-red-400', 'text-green-400');
                                 } catch (e) { 
                                     console.error("Error BD:", e); 
-                                    syncStatus.innerText = "❌ Fallo envío al servidor (Revisar Reglas Firebase)";
+                                    syncStatus.innerText = "❌ Fallo envío al servidor";
                                     syncStatus.classList.replace('text-green-400', 'text-red-400');
                                 }
                             }, (err) => { 
                                 alert(err.code === 1 ? "⚠️ Debe 'Permitir' el acceso a la ubicación en su celular." : "Error GPS: " + escapeHTML(err.message));
                                 giantBtn.style.display = 'block'; 
                                 tapInstruction.style.display = 'block';
+                                btnStopGps.classList.add('hidden');
                                 tapInstruction.innerText = "REINTENTAR GPS";
                                 navigator.geolocation.clearWatch(watchId); watchId = null;
                             }, { enableHighAccuracy: true, maximumAge: 0, timeout: 27000 });
@@ -602,6 +584,24 @@
                 };
 
                 giantBtn.addEventListener('click', startTracking);
+
+                // BOTÓN DESCONECTAR PARA VOLUNTARIOS
+                btnStopGps.addEventListener('click', async () => {
+                    if(watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+                    if(db && auth?.currentUser) {
+                        try {
+                            // Marcar como inactivo en la base de datos
+                            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'locations', auth.currentUser.uid), { active: false }, { merge: true });
+                        } catch(e) { console.error("Error desactivando:", e); }
+                    }
+                    document.getElementById('tracker-mode-ui').innerHTML = `
+                        <div class="text-white text-center p-6 flex flex-col items-center">
+                            <h2 class="text-3xl font-bold mb-4 text-red-400">🛑 Desconectado</h2>
+                            <p class="text-lg">Su GPS ha sido apagado.<br>Ya no transmite al Puesto de Mando.</p>
+                            <p class="text-sm text-gray-300 mt-6">Puede cerrar esta pestaña segura.</p>
+                        </div>
+                    `;
+                });
             }
 
             if (isTrackerMode) return;
@@ -687,18 +687,98 @@
                 document.getElementById('nfc-modal').classList.remove('hidden');
                 const nameInput = document.getElementById('nfc-vol-name');
                 nameInput.value = name;
-                nameInput.dispatchEvent(new Event('input')); // Dispara la generación automática de la URL
+                nameInput.dispatchEvent(new Event('input')); 
             };
 
             addObjective(); addGroup();
 
+            // LÓGICA DEL MAPA Y RASTREO TÁCTICO
             let mymap; let volunteerMarkers = {};
             let isMapCentered = false; 
+            let latestLocations = {};
+            let locationUpdateInterval = null;
             
             function initLeafletMap() {
                 if(mymap) { mymap.invalidateSize(); return; }
                 mymap = L.map('mapid').setView([4.6097, -74.0817], 6); 
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mymap);
+            }
+
+            // FUNCIÓN PRINCIPAL DE RENDERIZADO MAPA Y ESTADOS (Auditoría cada 5 seg)
+            function renderMapMarkers() {
+                const validNames = window.getAvailableVolunteers(); // SEGURIDAD: Solo trae los creados en el tablero
+                const listEl = document.getElementById('live-users-list');
+                listEl.innerHTML = '';
+                let hasUsers = false;
+
+                for (const [id, data] of Object.entries(latestLocations)) {
+                    // SI LA UNIDAD NO ESTÁ EN EL TABLERO O ESTÁ DESACTIVADA, LA ELIMINA DEL MAPA
+                    if (!validNames.includes(data.name) || data.active === false) {
+                        if (volunteerMarkers[id]) {
+                            mymap.removeLayer(volunteerMarkers[id]);
+                            delete volunteerMarkers[id];
+                        }
+                        continue;
+                    }
+
+                    hasUsers = true;
+                    const diff = Date.now() - data.timestamp;
+                    
+                    let statusClass = 'text-green-600';
+                    let statusIcon = '🟢';
+                    let statusText = 'En línea';
+                    let markerColor = '#FF6B00';
+                    let isOffline = false;
+
+                    // LÓGICA DE TIEMPOS (Pérdida de GPS)
+                    if (diff > 120000) { // Mayor a 2 minutos sin reportar
+                        statusClass = 'text-red-500'; statusIcon = '🔴'; statusText = `Hace ${Math.floor(diff/60000)}m`; markerColor = '#888888'; isOffline = true;
+                    } else if (diff > 30000) { // Mayor a 30 segundos
+                        statusClass = 'text-yellow-600'; statusIcon = '🟡'; statusText = `Hace ${Math.floor(diff/1000)}s`; markerColor = '#EAB308';
+                    }
+
+                    const latlng = [data.lat, data.lng];
+                    const safeName = escapeHTML(data.name);
+                    const coordsText = `${data.lat.toFixed(5)}, ${data.lng.toFixed(5)}`;
+
+                    // Dibujar en la lista lateral con alta precisión
+                    listEl.innerHTML += `
+                        <li class="cursor-pointer hover:bg-gray-50 border-b border-gray-100 py-1" onclick="window.focusMapTo('${id}')" title="Centrar mapa en ${safeName}">
+                            <div class="flex justify-between items-center px-1">
+                                <span class="font-bold ${statusClass}">${statusIcon} ${safeName}</span> 
+                                <span class="text-[8px] text-gray-500 bg-gray-100 px-1 rounded">${statusText}</span>
+                            </div>
+                            <div class="text-[8.5px] text-gray-500 ml-5 font-mono">📍 ${coordsText}</div>
+                        </li>`;
+
+                    // Icono Táctico para el mapa
+                    const htmlIcon = `
+                        <div class="flex flex-col items-center ${isOffline ? 'opacity-60' : 'opacity-100'} transition-opacity duration-500">
+                            <svg viewBox="0 0 24 24" width="35" height="35" style="filter:drop-shadow(0 2px 2px rgba(0,0,0,0.5))">
+                                <path d="M4 11C4 6.58 7.58 3 12 3C16.42 3 20 6.58 20 11" fill="${markerColor}"/>
+                                <path d="M2 11H22" stroke="${markerColor}" stroke-width="2.5"/>
+                                <rect x="9" y="12" width="6" height="3" fill="#FFCC99" rx="1"/>
+                                <path d="M5 16v8h14v-8c0-1-4-2-7-2s-7 1-7 2z" fill="${markerColor}"/>
+                                <rect x="5" y="18" width="14" height="2.5" fill="#002855"/>
+                            </svg>
+                            <div class="bg-white px-1.5 py-0.5 rounded shadow-lg flex flex-col items-center mt-0.5 border-2 ${isOffline ? 'border-gray-400' : 'border-dcc-orange'}">
+                                <span class="text-[9px] font-bold ${isOffline ? 'text-gray-600' : 'text-dcc-blue'} whitespace-nowrap leading-tight">${safeName}</span>
+                                <span class="text-[7px] font-mono text-gray-500 leading-tight">${coordsText}</span>
+                            </div>
+                        </div>`;
+
+                    if (volunteerMarkers[id]) {
+                        volunteerMarkers[id].setLatLng(latlng);
+                        volunteerMarkers[id].setIcon(L.divIcon({ className: 'bg-transparent', html: htmlIcon, iconSize: [50, 60], iconAnchor: [25, 40] }));
+                    } else {
+                        volunteerMarkers[id] = L.marker(latlng, {
+                            icon: L.divIcon({ className: 'bg-transparent', html: htmlIcon, iconSize: [50, 60], iconAnchor: [25, 40] })
+                        }).addTo(mymap);
+                        if (!isMapCentered) { mymap.setView(latlng, 17); isMapCentered = true; }
+                    }
+                }
+
+                if (!hasUsers) listEl.innerHTML = '<li class="text-gray-400 italic text-center py-2">No hay unidades conectadas de los grupos actuales</li>';
             }
             
             function initCommandCenterGPS() {
@@ -707,36 +787,23 @@
                 onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'locations'), 
                 (snapshot) => {
                     document.getElementById('map-connection-status').classList.add('hidden'); 
-                    document.getElementById('live-users-list').innerHTML = '';
                     
-                    snapshot.forEach((doc) => {
-                        const data = doc.data(); 
-                        if (Date.now() - data.timestamp > 3600000) return; 
-                        
-                        const safeUserName = escapeHTML(data.name); 
-                        document.getElementById('live-users-list').innerHTML += `<li class="text-green-600 font-semibold cursor-pointer hover:text-green-800" onclick="window.focusMapTo('${doc.id}')" title="Centrar mapa">📍 ${safeUserName}</li>`;
-                        
-                        if(mymap) {
-                            const latlng = [data.lat, data.lng];
-                            if(volunteerMarkers[doc.id]) { 
-                                volunteerMarkers[doc.id].setLatLng(latlng); 
-                            } else { 
-                                volunteerMarkers[doc.id] = L.marker(latlng, {
-                                    icon: L.divIcon({ 
-                                        className: 'bg-transparent', 
-                                        html: `<div class="flex flex-col items-center"><svg viewBox="0 0 24 24" width="35" height="35" style="filter:drop-shadow(0 2px 2px rgba(0,0,0,0.5))"><path d="M4 11C4 6.58 7.58 3 12 3C16.42 3 20 6.58 20 11" fill="#FF6B00"/><path d="M2 11H22" stroke="#FF6B00" stroke-width="2.5"/><rect x="9" y="12" width="6" height="3" fill="#FFCC99" rx="1"/><path d="M5 16v8h14v-8c0-1-4-2-7-2s-7 1-7 2z" fill="#FF6B00"/><rect x="5" y="18" width="14" height="2.5" fill="#002855"/></svg><span class="bg-white text-[9px] px-1.5 py-0.5 rounded shadow-lg font-bold text-dcc-blue mt-0.5 whitespace-nowrap border border-dcc-orange">${safeUserName}</span></div>`, 
-                                        iconSize: [40, 50], iconAnchor: [20, 25] 
-                                    })
-                                }).addTo(mymap); 
-                                
-                                if(!isMapCentered) {
-                                    mymap.setView(latlng, 17); 
-                                    isMapCentered = true;
-                                }
+                    // Almacenar el estado actual de todas las posiciones
+                    snapshot.forEach((doc) => { latestLocations[doc.id] = doc.data(); });
+                    
+                    // Si se elimina un documento en la DB, limpiarlo de la caché local
+                    snapshot.docChanges().forEach((change) => {
+                        if (change.type === "removed") {
+                            delete latestLocations[change.doc.id];
+                            if(volunteerMarkers[change.doc.id]) {
+                                mymap.removeLayer(volunteerMarkers[change.doc.id]);
+                                delete volunteerMarkers[change.doc.id];
                             }
                         }
                     });
-                    if(document.getElementById('live-users-list').innerHTML === '') document.getElementById('live-users-list').innerHTML = '<li class="text-gray-400 italic">Sin conexión actual</li>';
+
+                    // Ejecutar renderizado
+                    renderMapMarkers();
                 }, 
                 (error) => {
                     console.error("Error en escucha Firestore:", error);
@@ -744,6 +811,11 @@
                     if (error.code === 'permission-denied') errMsg = "⚠️ BD Bloqueada: Falta habilitar Auth Anónimo o autorizar dominio en Firebase";
                     showConnError(errMsg);
                 });
+
+                // Activar chequeo constante de "Timeout" cada 5 segundos
+                if(!locationUpdateInterval) {
+                    locationUpdateInterval = setInterval(renderMapMarkers, 5000);
+                }
             }
             
             window.focusMapTo = (id) => {
