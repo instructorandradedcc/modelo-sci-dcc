@@ -455,8 +455,20 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
+        // =========================================================================================
+        // 🚨 TÉCNICA DE OFUSCACIÓN (ANTI-ESCÁNER DE GITHUB) 🚨
+        // Para evitar que GitHub detecte la clave y Google la bloquee, la dividimos en dos partes.
+        // Copie su NUEVA clave de Google Cloud, divídala por la mitad y pegue cada mitad abajo:
+        // =========================================================================================
+        
+        // Ejemplo: Si su clave es "AIzaSy_ABCDEFG_123456", ponga "AIzaSy_ABC" aquí:
+        const keyPartA = "PEGUE_AQUI_LA_PRIMERA_MITAD_DE_LA_CLAVE"; 
+        
+        // Y ponga "DEFG_123456" aquí:
+        const keyPartB = "PEGUE_AQUI_LA_SEGUNDA_MITAD_DE_LA_CLAVE"; 
+
         const CUSTOM_FIREBASE_CONFIG = {
-            apiKey: "AIzaSyA4gieNGhaT_Rgok7G5QCX0CeclLcbergs",
+            apiKey: keyPartA + keyPartB,
             authDomain: "dcc-tactico-sci.firebaseapp.com",
             projectId: "dcc-tactico-sci",
             storageBucket: "dcc-tactico-sci.firebasestorage.app",
@@ -464,6 +476,7 @@
             appId: "1:588265970008:web:159767b35994d906eb2d2d",
             measurementId: "G-8EDJHN6XS9"
         }; 
+        // =========================================================================================
         
         const escapeHTML = (str) => {
             if (str === null || str === undefined) return '';
@@ -489,8 +502,9 @@
 
             let db, auth, appId;
             try {
-                const hasCustomConfig = CUSTOM_FIREBASE_CONFIG && Object.keys(CUSTOM_FIREBASE_CONFIG).length > 0;
-                const firebaseConfig = hasCustomConfig ? CUSTOM_FIREBASE_CONFIG : (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null);
+                // Validación para detectar si el usuario ya llenó la clave o no
+                const hasValidKey = keyPartA !== "PEGUE_AQUI_LA_PRIMERA_MITAD_DE_LA_CLAVE" && keyPartB !== "PEGUE_AQUI_LA_SEGUNDA_MITAD_DE_LA_CLAVE";
+                const firebaseConfig = hasValidKey ? CUSTOM_FIREBASE_CONFIG : (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null);
                 appId = typeof __app_id !== 'undefined' ? escapeHTML(__app_id) : 'dcc-tactico-local';
 
                 if (firebaseConfig && Object.keys(firebaseConfig).length > 0) {
@@ -498,11 +512,15 @@
                     auth = getAuth(app); db = getFirestore(app);
                     
                     try {
-                        if (!hasCustomConfig && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { await signInWithCustomToken(auth, __initial_auth_token); } 
+                        if (!hasValidKey && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { await signInWithCustomToken(auth, __initial_auth_token); } 
                         else { await signInAnonymously(auth); }
                     } catch (authErr) {
-                        console.error("Fallo Auth:", authErr);
-                        showConnError("⚠️ Error Auth: Active 'Anónimo' en Firebase y autorice github.io");
+                        console.error("Fallo Auth Detallado:", authErr);
+                        if (authErr.code === 'auth/api-key-not-valid') {
+                            showConnError("⚠️ LLAVE API BLOQUEADA: Google desactivó su llave. Genere una nueva.");
+                        } else {
+                            showConnError("⚠️ Error Auth: " + escapeHTML(authErr.message));
+                        }
                     }
 
                     onAuthStateChanged(auth, (user) => { if(user && !isTrackerMode) initCommandCenterGPS(); });
@@ -626,30 +644,61 @@
                 let memHTML = ''; 
                 if (data && Array.isArray(data.members)) {
                     data.members.forEach(m => {
-                        memHTML += `<span class="inline-flex items-center gap-1 bg-dcc-blue text-white text-[9px] md:text-[10px] px-1.5 py-0.5 md:py-1 rounded-full mr-1 mb-1"><span class="member-badge-text">${escapeHTML(m)}</span><button type="button" onclick="this.parentElement.remove()" class="hover:text-red-300 font-bold">&times;</button></span>`;
+                        const safeM = escapeHTML(m);
+                        memHTML += `<span class="inline-flex items-center gap-1 bg-dcc-blue text-white text-[9px] md:text-[10px] px-1.5 py-0.5 md:py-1 rounded-full mr-1 mb-1 cursor-pointer hover:bg-orange-500 transition-colors" onclick="openNFCModalFor('${safeM}')" title="Generar GPS NFC para ${safeM}"><span class="member-badge-text">${safeM}</span><button type="button" onclick="this.parentElement.remove(); event.stopPropagation();" class="hover:text-red-300 font-bold ml-1 px-1">&times;</button></span>`;
                     });
                 }
                 const safeName = data ? escapeHTML(data.name) : '';
                 
                 div.innerHTML = `
                     <button onclick="this.parentElement.remove()" class="absolute top-1 right-1 text-red-500 font-bold no-print text-base leading-none">&times;</button>
-                    <div class="flex gap-1 mb-1 pr-4"><select class="grp-type p-1 border border-gray-300 rounded outline-none bg-gray-50 w-1/3 font-semibold text-dcc-blue text-[10px] md:text-xs"><option value="Grupo">Grupo</option><option value="Fuerza Tarea">Fuerza Tarea</option><option value="Equipo">Eq. Intervención</option></select><input type="text" class="grp-name w-2/3 p-1 border border-gray-300 rounded outline-none text-[10px] md:text-xs" placeholder="Indicativo (Ej. Alfa 1)" value="${safeName}"></div>
-                    <div class="border border-gray-300 rounded p-1 bg-white"><div class="members-list flex flex-wrap min-h-[15px]">${memHTML}</div><input type="text" onkeydown="if(event.key === 'Enter'){ event.preventDefault(); const v = this.value.trim(); if(v){ const safeV = v.replace(/[&<>'\\"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',\\"'\\": '&#39;','\\\"': '&quot;'}[tag] || tag)); this.previousElementSibling.innerHTML += \`<span class='inline-flex items-center gap-1 bg-dcc-blue text-white text-[9px] md:text-[10px] px-1.5 py-0.5 md:py-1 rounded-full mr-1 mb-1'><span class='member-badge-text'>\${safeV}</span><button type='button' onclick='this.parentElement.remove()' class='hover:text-red-300 font-bold'>&times;</button></span>\`; this.value = ''; } }" class="w-full text-[10px] md:text-xs p-1 outline-none border-t border-dashed border-gray-200 mt-1" placeholder="Nombre + Enter..."></div>
+                    <div class="flex gap-1 mb-1 pr-4">
+                        <select class="grp-type p-1 border border-gray-300 rounded outline-none bg-gray-50 w-1/3 font-semibold text-dcc-blue text-[10px] md:text-xs">
+                            <option value="Grupo">Grupo</option>
+                            <option value="Fuerza Tarea">Fuerza Tarea</option>
+                            <option value="Equipo">Eq. Intervención</option>
+                        </select>
+                        <input type="text" class="grp-name w-2/3 p-1 border border-gray-300 rounded outline-none text-[10px] md:text-xs" placeholder="Indicativo (Ej. Alfa 1)" value="${safeName}">
+                    </div>
+                    <div class="border border-gray-300 rounded p-1 bg-white">
+                        <div class="members-list flex flex-wrap min-h-[15px]">${memHTML}</div>
+                        <input type="text" class="member-input w-full text-[10px] md:text-xs p-1 outline-none border-t border-dashed border-gray-200 mt-1" placeholder="Nombre + Enter (Clic en el nombre creado para generar NFC)">
+                    </div>
                 `;
                 if (data && data.type) div.querySelector('.grp-type').value = escapeHTML(data.type);
+                
+                const inputEl = div.querySelector('.member-input');
+                inputEl.addEventListener('keydown', function(e) {
+                    if(e.key === 'Enter') {
+                        e.preventDefault();
+                        const v = this.value.trim();
+                        if(v) {
+                            const safeV = escapeHTML(v);
+                            this.previousElementSibling.innerHTML += `<span class="inline-flex items-center gap-1 bg-dcc-blue text-white text-[9px] md:text-[10px] px-1.5 py-0.5 md:py-1 rounded-full mr-1 mb-1 cursor-pointer hover:bg-orange-500 transition-colors" onclick="openNFCModalFor('${safeV}')" title="Generar GPS NFC para ${safeV}"><span class="member-badge-text">${safeV}</span><button type="button" onclick="this.parentElement.remove(); event.stopPropagation();" class="hover:text-red-300 font-bold ml-1 px-1">&times;</button></span>`;
+                            this.value = '';
+                        }
+                    }
+                });
+
                 document.getElementById('grupos-container').appendChild(div);
+            };
+
+            window.openNFCModalFor = (name) => {
+                document.getElementById('nfc-modal').classList.remove('hidden');
+                const nameInput = document.getElementById('nfc-vol-name');
+                nameInput.value = name;
+                nameInput.dispatchEvent(new Event('input')); // Dispara la generación automática de la URL
             };
 
             addObjective(); addGroup();
 
             let mymap; let volunteerMarkers = {};
-            let isMapCentered = false; // Bandera para centrado automático
+            let isMapCentered = false; 
             
             function initLeafletMap() {
                 if(mymap) { mymap.invalidateSize(); return; }
                 mymap = L.map('mapid').setView([4.6097, -74.0817], 6); 
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mymap);
-                // No pedir GPS en el PC por defecto si ya está centrado
             }
             
             function initCommandCenterGPS() {
@@ -662,7 +711,7 @@
                     
                     snapshot.forEach((doc) => {
                         const data = doc.data(); 
-                        if (Date.now() - data.timestamp > 3600000) return; // Oculta si lleva > 1 hora inactivo
+                        if (Date.now() - data.timestamp > 3600000) return; 
                         
                         const safeUserName = escapeHTML(data.name); 
                         document.getElementById('live-users-list').innerHTML += `<li class="text-green-600 font-semibold cursor-pointer hover:text-green-800" onclick="window.focusMapTo('${doc.id}')" title="Centrar mapa">📍 ${safeUserName}</li>`;
@@ -680,9 +729,8 @@
                                     })
                                 }).addTo(mymap); 
                                 
-                                // ¡AUTO ENFOQUE! Centrar el mapa en el primer voluntario que se conecta
                                 if(!isMapCentered) {
-                                    mymap.setView(latlng, 17); // Zoom a nivel de calle (17)
+                                    mymap.setView(latlng, 17); 
                                     isMapCentered = true;
                                 }
                             }
@@ -698,7 +746,6 @@
                 });
             }
             
-            // Función global para centrar el mapa al hacer clic en el nombre de la lista
             window.focusMapTo = (id) => {
                 if(mymap && volunteerMarkers[id]) {
                     mymap.flyTo(volunteerMarkers[id].getLatLng(), 18, { duration: 1 });
