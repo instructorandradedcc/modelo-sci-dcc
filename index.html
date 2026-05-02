@@ -462,13 +462,13 @@
         // =========================================================================================
         
         // Ejemplo: Si su clave es "AIzaSy_ABCDEFG_123456", ponga "AIzaSy_ABC" aquí:
-        const keyPartA = "AIzaSyDlkkQdkBgD_"; 
+        const keyPartA = "PEGUE_AQUI_LA_PRIMERA_MITAD_DE_LA_CLAVE"; 
         
         // Y ponga "DEFG_123456" aquí:
-        const keyPartB = "1ZBvnLuTzOUGvixMNF5CAU"; 
+        const keyPartB = "PEGUE_AQUI_LA_SEGUNDA_MITAD_DE_LA_CLAVE"; 
 
         const CUSTOM_FIREBASE_CONFIG = {
-            apiKey: "AIzaSyDlkkQdkBgD_1ZBvnLuTzOUGvixMNF5CAU"  keyPartA + keyPartB, // Si prefiere no dividirla, simplemente borre esto y pegue su clave completa entre comillas: "AIzaSy..."
+            apiKey: keyPartA + keyPartB, // Si prefiere no dividirla, simplemente borre esto y pegue su clave completa entre comillas: "AIzaSy..."
             authDomain: "dcc-tactico-sci.firebaseapp.com",
             projectId: "dcc-tactico-sci",
             storageBucket: "dcc-tactico-sci.firebasestorage.app",
@@ -502,11 +502,9 @@
 
             let db, auth, appId;
             try {
-                // Validación de entorno: Detecta si está en el editor (Canvas) o en GitHub
-                const isRunningInCanvas = typeof __firebase_config !== 'undefined';
-                
-                // Si está en el editor, usa las credenciales de prueba internas. Si está en GitHub, usa sus claves custom.
-                const firebaseConfig = isRunningInCanvas ? JSON.parse(__firebase_config) : CUSTOM_FIREBASE_CONFIG;
+                // Validación robusta para detectar si la clave ya fue ingresada (completa o partida)
+                const hasValidKey = CUSTOM_FIREBASE_CONFIG && CUSTOM_FIREBASE_CONFIG.apiKey && !CUSTOM_FIREBASE_CONFIG.apiKey.includes("PEGUE_AQUI");
+                const firebaseConfig = hasValidKey ? CUSTOM_FIREBASE_CONFIG : (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null);
                 appId = typeof __app_id !== 'undefined' ? escapeHTML(__app_id) : 'dcc-tactico-local';
 
                 // Verifica que la clave final sea válida y no el texto por defecto
@@ -515,8 +513,8 @@
                     auth = getAuth(app); db = getFirestore(app);
                     
                     try {
-                        // Usa el token seguro interno solo si está dentro del Canvas
-                        if (isRunningInCanvas && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { 
+                        // IMPORTANTE: Solo usar el token interno del editor si NO estamos usando la clave personalizada.
+                        if (!hasValidKey && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { 
                             await signInWithCustomToken(auth, __initial_auth_token); 
                         } else { 
                             await signInAnonymously(auth); 
