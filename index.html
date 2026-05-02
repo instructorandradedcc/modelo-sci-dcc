@@ -502,18 +502,25 @@
 
             let db, auth, appId;
             try {
-                // Validación robusta para detectar si la clave ya fue ingresada (completa o partida)
-                const hasValidKey = CUSTOM_FIREBASE_CONFIG && CUSTOM_FIREBASE_CONFIG.apiKey && !CUSTOM_FIREBASE_CONFIG.apiKey.includes("PEGUE_AQUI");
-                const firebaseConfig = hasValidKey ? CUSTOM_FIREBASE_CONFIG : (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null);
+                // Validación de entorno: Detecta si está en el editor (Canvas) o en GitHub
+                const isRunningInCanvas = typeof __firebase_config !== 'undefined';
+                
+                // Si está en el editor, usa las credenciales de prueba internas. Si está en GitHub, usa sus claves custom.
+                const firebaseConfig = isRunningInCanvas ? JSON.parse(__firebase_config) : CUSTOM_FIREBASE_CONFIG;
                 appId = typeof __app_id !== 'undefined' ? escapeHTML(__app_id) : 'dcc-tactico-local';
 
-                if (firebaseConfig && Object.keys(firebaseConfig).length > 0) {
+                // Verifica que la clave final sea válida y no el texto por defecto
+                if (firebaseConfig && Object.keys(firebaseConfig).length > 0 && firebaseConfig.apiKey && !firebaseConfig.apiKey.includes("PEGUE_AQUI")) {
                     const app = initializeApp(firebaseConfig);
                     auth = getAuth(app); db = getFirestore(app);
                     
                     try {
-                        if (hasValidKey && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { await signInWithCustomToken(auth, __initial_auth_token); } 
-                        else { await signInAnonymously(auth); }
+                        // Usa el token seguro interno solo si está dentro del Canvas
+                        if (isRunningInCanvas && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { 
+                            await signInWithCustomToken(auth, __initial_auth_token); 
+                        } else { 
+                            await signInAnonymously(auth); 
+                        }
                     } catch (authErr) {
                         console.error("Fallo Auth Detallado:", authErr);
                         if (authErr.code === 'auth/api-key-not-valid') {
@@ -525,7 +532,7 @@
 
                     onAuthStateChanged(auth, (user) => { if(user && !isTrackerMode) initCommandCenterGPS(); });
                 } else {
-                    showConnError("⚠️ Servidor Firebase No Configurado");
+                    showConnError("⚠️ Servidor Firebase No Configurado (Pegue su clave API)");
                 }
             } catch(err) { 
                 console.error("Error inicial:", err);
