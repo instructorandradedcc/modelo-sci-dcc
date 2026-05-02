@@ -120,7 +120,7 @@
                 00.00000, -00.00000
             </div>
             
-            <p class="text-[10px] text-gray-400 mt-2 text-center" id="sync-status">📡 Sincronizando con PC Puesto de Mando...</p>
+            <p class="text-[10px] text-gray-400 mt-2 text-center" id="sync-status">📡 Sincronizando con Sala Situacional...</p>
             
             <div class="flex gap-2 mt-3 w-full">
                 <button id="btn-copy-coords" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold py-2 px-2 rounded shadow">
@@ -151,12 +151,19 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-1 md:gap-3 text-[10px] md:text-sm no-print">
+                    
+                    <!-- INDICADOR DE SALA VIRTUAL -->
+                    <div class="hidden md:flex flex-col items-end mr-2">
+                        <span class="text-[8px] text-orange-200 font-bold uppercase tracking-wider">Cód. Operación</span>
+                        <span id="room-id-display" class="font-mono bg-white/20 px-2 py-0.5 rounded text-xs font-bold border border-white/30 tracking-widest text-white shadow-inner">----</span>
+                    </div>
+
                     <button id="btn-import-json" class="bg-white/20 hover:bg-white/30 text-white py-1 px-2 rounded flex items-center gap-1 border border-white/30" title="Cargar archivo">📂 <span class="hidden md:inline">Cargar</span></button>
                     <input type="file" id="import-file-input" accept=".json" class="hidden">
                     <input type="file" id="map-upload-input" accept="image/*" class="hidden">
                     <button id="btn-export-json" class="bg-white/20 hover:bg-white/30 text-white py-1 px-2 rounded flex items-center gap-1 border border-white/30" title="Guardar archivo local">💾 <span class="hidden md:inline">Guardar</span></button>
                     <button onclick="window.print()" class="bg-dcc-blue hover:bg-blue-900 text-white font-bold py-1 px-2 md:px-4 rounded shadow flex items-center gap-1">🖨️ <span class="hidden lg:inline">Imprimir</span></button>
-                    <!-- NUEVO BOTON DE NUEVA OPERACIÓN -->
+                    <!-- BOTON NUEVA OPERACIÓN -->
                     <button id="btn-new-incident" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-2 md:px-4 rounded shadow flex items-center gap-1 border border-red-800" title="Limpiar tablero e iniciar nueva operación GPS">🚨 <span class="hidden lg:inline">Nueva Op.</span></button>
                 </div>
             </div>
@@ -293,7 +300,7 @@
                                 <label class="block text-sm font-bold text-gray-800">Recursos: Grupos y Fuerzas de Tarea</label>
                                 <button onclick="addGroup()" class="bg-dcc-blue text-white px-2 py-1 rounded text-[10px] font-bold no-print shadow hover:bg-blue-800">+ Añadir Grupo</button>
                             </div>
-                            <p class="text-[10px] text-dcc-orange font-bold italic mb-2">Las personas escritas aquí o en el Staff de Comando son las ÚNICAS autorizadas para aparecer en el mapa GPS de esta sesión.</p>
+                            <p class="text-[10px] text-dcc-orange font-bold italic mb-2">Las personas escritas aquí o en el Staff de Comando son las ÚNICAS autorizadas para aparecer en el mapa GPS de esta sesión operativa.</p>
                             <div id="grupos-container" class="space-y-2 flex-1 max-h-40 overflow-y-auto pr-1">
                             </div>
                         </div>
@@ -417,11 +424,11 @@
     <div id="nfc-modal" class="hidden fixed inset-0 z-[200] bg-black/60 flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md border-t-4 border-dcc-blue">
             <h3 class="text-xl font-bold text-dcc-blue mb-4">Generar Enlace para Tag NFC</h3>
-            <p class="text-sm text-gray-600 mb-4">Grabe este enlace en una etiqueta NFC. El voluntario necesita este nuevo enlace generado para unirse a la sesión actual.</p>
+            <p class="text-sm text-gray-600 mb-4">Grabe este enlace en una etiqueta NFC o compártalo por WhatsApp. El voluntario necesita este enlace exclusivo para unirse a la sala situacional actual.</p>
             <label class="block text-sm font-bold text-gray-700 mb-1">Indicativo de la Unidad:</label>
             <input type="text" id="nfc-vol-name" class="w-full p-2 border border-gray-300 rounded mb-4 focus:border-dcc-orange outline-none" placeholder="Ej. Escuadra Alfa">
             <div class="bg-blue-50 border-l-4 border-dcc-blue p-2 mb-4 text-xs text-dcc-blue">
-                <strong>Clave Operativa:</strong> Este enlace contiene una llave de seguridad (Session ID) exclusiva para esta operación. Links de operaciones anteriores serán rechazados.
+                <strong>Clave de Sala:</strong> Este enlace está atado al ID de Operación de la URL superior. Garantiza que sus datos GPS no se crucen con ninguna otra emergencia a nivel nacional.
             </div>
             <textarea id="nfc-url-output" class="w-full p-2 bg-gray-100 border border-gray-300 rounded text-xs text-gray-500 mb-4" rows="3" readonly></textarea>
             <div class="flex justify-end gap-2">
@@ -458,20 +465,37 @@
             return String(str).replace(/[&<>'"]/g, tag => ({'&': '&amp;','<': '&lt;','>': '&gt;',"'": '&#39;','"': '&quot;'}[tag] || tag));
         };
 
-        // GENERACIÓN DE ID DE SESIÓN ÚNICA PARA EVITAR FANTASMAS
-        window.currentSessionId = Math.random().toString(36).substr(2, 9);
+        // ============================================================================
+        // LÓGICA DE SALAS SITUACIONALES VIRTUALES (MULTI-TENANCY POR URL)
+        // ============================================================================
+        const urlParams = new URLSearchParams(window.location.search);
+        const isTrackerMode = escapeHTML(urlParams.get('tracker')) === 'true';
+        let currentIncidentRoomId = escapeHTML(urlParams.get('incident'));
+        
+        // Si es el Puesto de Mando (no tracker) y NO tiene ID de incidente en la URL, se crea una sala nueva automáticamente
+        if (!isTrackerMode && !currentIncidentRoomId) {
+            // Genera un código único tipo DCC-A1B2C
+            currentIncidentRoomId = 'DCC-' + Math.random().toString(36).substr(2, 5).toUpperCase();
+            
+            // Actualiza la barra de direcciones sin recargar la página
+            const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?incident=' + currentIncidentRoomId;
+            window.history.replaceState({path: newUrl}, '', newUrl);
+        }
+
+        // Variable global legacy para el botón NFC
+        window.currentSessionId = currentIncidentRoomId;
 
         document.addEventListener('DOMContentLoaded', async () => {
             
-            const urlParams = new URLSearchParams(window.location.search);
-            const isTrackerMode = escapeHTML(urlParams.get('tracker')) === 'true';
             const volunteerName = escapeHTML(urlParams.get('name')) || 'Voluntario Anónimo';
-            const urlSession = escapeHTML(urlParams.get('session')) || 'default'; // El tracker hereda la sesión del Link
 
             if (isTrackerMode) {
                 document.getElementById('tracker-mode-ui').classList.remove('hidden');
                 document.getElementById('command-center-ui').classList.add('hidden');
                 document.getElementById('tracker-volunteer-name').innerText = `Unidad: ${volunteerName}`;
+            } else {
+                // Mostrar el código de sala en el PMU
+                document.getElementById('room-id-display').innerText = currentIncidentRoomId;
             }
 
             function showConnError(msg) {
@@ -557,11 +581,11 @@
                                     return;
                                 }
                                 
-                                // FLAG ACTIVE y SESSION para control de fantasmas
-                                const locData = { name: volunteerName, lat: lat, lng: lng, timestamp: Date.now(), active: true, session: urlSession };
+                                const locData = { name: volunteerName, lat: lat, lng: lng, timestamp: Date.now(), active: true, session: currentIncidentRoomId };
                                 try { 
-                                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'locations', auth.currentUser.uid), locData); 
-                                    syncStatus.innerText = "✅ Transmitiendo en vivo al Puesto de Mando";
+                                    // LA MAGIA DEL AISLAMIENTO DE DATOS: Guardamos en una colección nombrada específicamente para este incidente.
+                                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'locations_' + currentIncidentRoomId, auth.currentUser.uid), locData); 
+                                    syncStatus.innerText = "✅ Transmitiendo a la Sala Situacional: " + currentIncidentRoomId;
                                     syncStatus.classList.replace('text-red-400', 'text-green-400');
                                 } catch (e) { 
                                     syncStatus.innerText = "❌ Fallo envío al servidor";
@@ -584,7 +608,7 @@
                 btnStopGps.addEventListener('click', async () => {
                     if(watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
                     if(db && auth?.currentUser) {
-                        try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'locations', auth.currentUser.uid), { active: false }, { merge: true }); } catch(e) {}
+                        try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'locations_' + currentIncidentRoomId, auth.currentUser.uid), { active: false }, { merge: true }); } catch(e) {}
                     }
                     document.getElementById('tracker-mode-ui').innerHTML = `
                         <div class="text-white text-center p-6 flex flex-col items-center">
@@ -598,11 +622,9 @@
 
             if (isTrackerMode) return;
 
-            // FUNCIÓN MEJORADA: Obtiene TODOS los nombres autorizados del SCI (Grupos + Staff Comando + Jefes Sección)
             window.getAvailableVolunteers = () => {
                 const names = new Set(Array.from(document.querySelectorAll('.member-badge-text')).map(b => b.innerText.trim()));
                 
-                // Función para añadir si el check está activo y hay un nombre escrito
                 const checkAndAdd = (inputId, chkId) => {
                     const inp = document.getElementById(inputId);
                     const chk = chkId ? document.getElementById(chkId) : null;
@@ -611,7 +633,7 @@
                     }
                 };
 
-                checkAndAdd('staff-comandante'); // El comandante siempre aplica
+                checkAndAdd('staff-comandante'); 
                 checkAndAdd('staff-seguridad', 'chk-seguridad');
                 checkAndAdd('staff-informacion', 'chk-informacion');
                 checkAndAdd('staff-enlace', 'chk-enlace');
@@ -708,12 +730,11 @@
 
             addObjective(); addGroup();
 
-            // FUNCIÓN DE EXPULSIÓN MANUAL (La "X" en la lista de conectados)
             window.forceDisconnectUser = async (uid) => {
                 if(confirm("¿Está seguro de expulsar y desconectar esta unidad del mapa de forma manual?")) {
                     if(db) {
                         try {
-                            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'locations', uid), { active: false }, { merge: true });
+                            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'locations_' + currentIncidentRoomId, uid), { active: false }, { merge: true });
                             if (volunteerMarkers[uid]) {
                                 mymap.removeLayer(volunteerMarkers[uid]);
                                 delete volunteerMarkers[uid];
@@ -723,7 +744,6 @@
                 }
             };
 
-            // LÓGICA DEL MAPA Y RASTREO TÁCTICO
             let mymap; let volunteerMarkers = {};
             let isMapCentered = false; 
             let latestLocations = {};
@@ -735,19 +755,16 @@
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mymap);
             }
 
-            // FUNCIÓN PRINCIPAL DE RENDERIZADO MAPA Y ESTADOS
             function renderMapMarkers() {
-                const validNames = window.getAvailableVolunteers(); // Trae Grupos y Staff
+                const validNames = window.getAvailableVolunteers();
                 const listEl = document.getElementById('live-users-list');
                 listEl.innerHTML = '';
                 let hasUsers = false;
 
                 for (const [id, data] of Object.entries(latestLocations)) {
                     
-                    // REGLA DE SEGURIDAD 1: Si no es de esta Sesión (link viejo), lo ignora
-                    // REGLA DE SEGURIDAD 2: Si el nombre no está escrito en el SCI-201, lo ignora
-                    // REGLA DE SEGURIDAD 3: Si se desconectó voluntaria o manualmente, lo ignora
-                    if (data.session !== window.currentSessionId || !validNames.includes(data.name) || data.active === false) {
+                    // Doble validación: Que coincida la sala (por seguridad) y que el nombre esté escrito en el SCI 201
+                    if (data.session !== currentIncidentRoomId || !validNames.includes(data.name) || data.active === false) {
                         if (volunteerMarkers[id]) {
                             mymap.removeLayer(volunteerMarkers[id]);
                             delete volunteerMarkers[id];
@@ -774,7 +791,6 @@
                     const safeName = escapeHTML(data.name);
                     const coordsText = `${data.lat.toFixed(5)}, ${data.lng.toFixed(5)}`;
 
-                    // Dibujar en la lista lateral (Incluyendo el Botón X para eliminarlo manualmente)
                     listEl.innerHTML += `
                         <li class="cursor-pointer hover:bg-gray-50 border-b border-gray-100 py-1" onclick="window.focusMapTo('${id}')" title="Centrar mapa en ${safeName}">
                             <div class="flex justify-between items-center px-1">
@@ -813,13 +829,14 @@
                     }
                 }
 
-                if (!hasUsers) listEl.innerHTML = '<li class="text-gray-400 italic text-center py-2">Sin unidades de esta operación</li>';
+                if (!hasUsers) listEl.innerHTML = '<li class="text-gray-400 italic text-center py-2">Sin unidades conectadas a esta Sala</li>';
             }
             
             function initCommandCenterGPS() {
                 document.getElementById('map-connection-status').classList.add('hidden');
                 
-                onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'locations'), 
+                // NOTA TÁCTICA: Ahora escucha EXCLUSIVAMENTE a la carpeta de datos de ESTA sala.
+                onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'locations_' + currentIncidentRoomId), 
                 (snapshot) => {
                     document.getElementById('map-connection-status').classList.add('hidden'); 
                     
@@ -854,39 +871,12 @@
                 }
             };
 
-            // BOTÓN DE NUEVA OPERACIÓN (Limpia todo el tablero y cambia la sesión GPS)
+            // BOTÓN DE NUEVA OPERACIÓN: La solución más limpia es recargar la página sin parámetros, 
+            // lo que forzará al sistema a generar una nueva sala limpia inmediatamente.
             document.getElementById('btn-new-incident').addEventListener('click', () => {
-                if(confirm('⚠️ ¿ATENCIÓN: Está seguro de iniciar una NUEVA OPERACIÓN?\n\nEsto limpiará todo el tablero, borrará el mapa y requerirá generar NUEVOS ENLACES GPS para que el personal se conecte. (Las conexiones de la operación anterior se ocultarán).')) {
-                    
-                    // 1. Generar nueva llave de seguridad de sesión
-                    window.currentSessionId = Math.random().toString(36).substr(2, 9);
-                    
-                    // 2. Limpiar Datos SCI 201 (Textos y Fechas)
-                    document.querySelectorAll('#sci201-content input[type="text"], #sci201-content input[type="datetime-local"]').forEach(i => i.value = '');
-                    document.querySelectorAll('#sci201-content input[type="checkbox"]').forEach(c => { c.checked = true; window.toggleRoleInput(c); });
-                    
-                    // 3. Limpiar Contenedores Dinámicos
-                    document.getElementById('objetivos-container').innerHTML = ''; addObjective();
-                    document.getElementById('grupos-container').innerHTML = ''; addGroup();
-                    document.getElementById('sci207-body').innerHTML = ''; addPatientRow();
-                    document.getElementById('sci211-body').innerHTML = ''; addLogEntry();
-                    
-                    // 4. Limpiar Evidencias Fotográficas
-                    evidencesList = []; renderEvidences();
-                    
-                    // 5. Limpiar Pizarra Local y Planos
-                    currentMapImage = null; 
-                    mapCtx.clearRect(0,0, mapCanvas.width, mapCanvas.height); 
-                    drawingCtx.clearRect(0,0, drawingCanvas.width, drawingCanvas.height); 
-                    placedObjects = []; drawObjects();
-                    
-                    // 6. Limpiar Mapa GPS y Marcadores Locales
-                    for(let id in volunteerMarkers) { mymap.removeLayer(volunteerMarkers[id]); }
-                    volunteerMarkers = {};
-                    latestLocations = {};
-                    renderMapMarkers();
-                    
-                    alert('✅ Tablero Limpio y Nueva Sesión Iniciada.\nGenere nuevos URLs NFC para el personal que intervendrá ahora.');
+                if(confirm('⚠️ ¿ATENCIÓN: Está seguro de iniciar una NUEVA OPERACIÓN?\n\nEsto recargará el tablero creando una "Sala Virtual" completamente nueva y aislada. Deberá enviar los nuevos enlaces GPS a su personal.')) {
+                    // Recargar quitando el ?incident= actual. Al volver a cargar, el JS creará uno nuevo automático.
+                    window.location.href = window.location.pathname;
                 }
             });
 
@@ -1034,12 +1024,12 @@
             
             document.getElementById('nfc-vol-name').addEventListener('input', () => { 
                 const baseUrl = window.location.href.split('?')[0];
-                // ENLACE AHORA INCLUYE LA SESIÓN ÚNICA GENERADA
-                document.getElementById('nfc-url-output').value = `${baseUrl}?tracker=true&name=${encodeURIComponent(document.getElementById('nfc-vol-name').value)}&session=${window.currentSessionId}`; 
+                // ENLACE AHORA LLEVA ESTRICTAMENTE EL CÓDIGO DE LA SALA VIRTUAL
+                document.getElementById('nfc-url-output').value = `${baseUrl}?tracker=true&name=${encodeURIComponent(document.getElementById('nfc-vol-name').value)}&incident=${currentIncidentRoomId}`; 
             });
             
             document.getElementById('btn-close-nfc').addEventListener('click', () => document.getElementById('nfc-modal').classList.add('hidden'));
-            document.getElementById('btn-copy-nfc').addEventListener('click', () => { document.getElementById('nfc-url-output').select(); document.execCommand('copy'); alert("URL copiada con Llave de Operación."); });
+            document.getElementById('btn-copy-nfc').addEventListener('click', () => { document.getElementById('nfc-url-output').select(); document.execCommand('copy'); alert("URL copiada.\n¡Importante! Este enlace es exclusivo para la sala " + currentIncidentRoomId); });
 
             window.addPatientRow = (data = ['', '', '', 'verde', '']) => {
                 const tr = document.createElement('tr'); tr.className = "border-b hover:bg-red-50";
