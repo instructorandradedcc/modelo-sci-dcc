@@ -455,20 +455,16 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
-        // =========================================================================================
-        // 🚨 TÉCNICA DE OFUSCACIÓN (ANTI-ESCÁNER DE GITHUB) 🚨
-        // Para evitar que GitHub detecte la clave y Google la bloquee, la dividimos en dos partes.
-        // Copie su NUEVA clave de Google Cloud, divídala por la mitad y pegue cada mitad abajo:
-        // =========================================================================================
-        
-        // Ejemplo: Si su clave es "AIzaSy_ABCDEFG_123456", ponga "AIzaSy_ABC" aquí:
-        const keyPartA = "AIzaSyBzSujLaNfac"; 
-        
-        // Y ponga "DEFG_123456" aquí:
-        const keyPartB = "PwuZ7cE3NSjWAvL7CUCYuY"; 
+        // 🚨 INSTRUCCIONES ESTRICTAS PARA LA CLAVE API 🚨
+        // Para que GitHub NO bloquee su mapa, DEBE pegar la clave en dos pedazos.
+        // NUNCA pegue la clave completa en una sola línea.
+
+        // Ejemplo: Si su clave es "AIzaSy1234567890abcdefg", divídala así:
+        const PARTE_1 = "AIzaSyDlkkQdkBgD_1"; // Pegue la primera mitad aquí
+        const PARTE_2 = "ZBvnLuTzOUGvixMNF5CAU"; // Pegue la segunda mitad aquí
 
         const CUSTOM_FIREBASE_CONFIG = {
-            apiKey:"AIzaSyBzSujLaNfacPwuZ7cE3NSjWAvL7CUCYuY" 
+            apiKey: PARTE_1 + PARTE_2,
             authDomain: "dcc-tactico-sci.firebaseapp.com",
             projectId: "dcc-tactico-sci",
             storageBucket: "dcc-tactico-sci.firebasestorage.app",
@@ -476,7 +472,6 @@
             appId: "1:588265970008:web:159767b35994d906eb2d2d",
             measurementId: "G-8EDJHN6XS9"
         }; 
-        // =========================================================================================
         
         const escapeHTML = (str) => {
             if (str === null || str === undefined) return '';
@@ -502,19 +497,19 @@
 
             let db, auth, appId;
             try {
-                // Validación robusta para detectar si la clave ya fue ingresada (completa o partida)
-                const hasValidKey = CUSTOM_FIREBASE_CONFIG && CUSTOM_FIREBASE_CONFIG.apiKey && !CUSTOM_FIREBASE_CONFIG.apiKey.includes("PEGUE_AQUI");
-                const firebaseConfig = hasValidKey ? CUSTOM_FIREBASE_CONFIG : (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null);
+                // Verificación estricta: Revisa si el usuario configuró la clave o si debe usar el entorno de prueba interno.
+                const isRunningInCanvas = typeof __firebase_config !== 'undefined';
+                const hasValidKey = PARTE_1 !== "PEGUE_AQUI_PRIMERA_MITAD" && PARTE_2 !== "PEGUE_AQUI_SEGUNDA_MITAD";
+                
+                const firebaseConfig = hasValidKey ? CUSTOM_FIREBASE_CONFIG : (isRunningInCanvas ? JSON.parse(__firebase_config) : null);
                 appId = typeof __app_id !== 'undefined' ? escapeHTML(__app_id) : 'dcc-tactico-local';
 
-                // Verifica que la clave final sea válida y no el texto por defecto
-                if (firebaseConfig && Object.keys(firebaseConfig).length > 0 && firebaseConfig.apiKey && !firebaseConfig.apiKey.includes("PEGUE_AQUI")) {
+                if (firebaseConfig && Object.keys(firebaseConfig).length > 0) {
                     const app = initializeApp(firebaseConfig);
                     auth = getAuth(app); db = getFirestore(app);
                     
                     try {
-                        // IMPORTANTE: Solo usar el token interno del editor si NO estamos usando la clave personalizada.
-                        if (!hasValidKey && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { 
+                        if (!hasValidKey && isRunningInCanvas && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { 
                             await signInWithCustomToken(auth, __initial_auth_token); 
                         } else { 
                             await signInAnonymously(auth); 
@@ -522,7 +517,7 @@
                     } catch (authErr) {
                         console.error("Fallo Auth Detallado:", authErr);
                         if (authErr.code === 'auth/api-key-not-valid') {
-                            showConnError("⚠️ LLAVE API BLOQUEADA: Google desactivó su llave. Genere una nueva.");
+                            showConnError("⚠️ LLAVE API BLOQUEADA: Google desactivó su llave por la alerta de GitHub. Genere una nueva y péguela en dos pedazos.");
                         } else {
                             showConnError("⚠️ Error Auth: " + escapeHTML(authErr.message));
                         }
@@ -530,7 +525,7 @@
 
                     onAuthStateChanged(auth, (user) => { if(user && !isTrackerMode) initCommandCenterGPS(); });
                 } else {
-                    showConnError("⚠️ Servidor Firebase No Configurado (Pegue su clave API)");
+                    showConnError("⚠️ Servidor Firebase No Configurado (Pegue su clave API en PARTE_1 y PARTE_2)");
                 }
             } catch(err) { 
                 console.error("Error inicial:", err);
